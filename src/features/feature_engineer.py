@@ -65,7 +65,7 @@ from numba import jit, prange
 
 
 class FeatureType(Enum):
-    """Типы признаков для оптимизации под tree модели"""
+    """Feature types optimized for tree-based models"""
     NUMERICAL = "numerical"
     CATEGORICAL = "categorical"
     BINARY = "binary"
@@ -79,7 +79,7 @@ class FeatureType(Enum):
 
 
 class ScalingMethod(Enum):
-    """Методы масштабирования данных"""
+    """Data scaling methods"""
     NONE = "none"
     STANDARD = "standard"  # Z-score normalization
     ROBUST = "robust"  # Median and IQR
@@ -91,9 +91,9 @@ class ScalingMethod(Enum):
 
 @dataclass
 class FeatureConfig:
-    """Конфигурация feature engineering"""
-    
-    # Основные параметры
+    """Feature engineering configuration"""
+
+    # Main parameters
     enable_technical_indicators: bool = True
     enable_statistical_features: bool = True
     enable_lag_features: bool = True
@@ -154,7 +154,7 @@ class FeatureConfig:
 
 @dataclass
 class FeatureMetadata:
-    """Метаданные о созданных признаках"""
+    """Metadata about created features"""
     
     feature_names: List[str] = field(default_factory=list)
     feature_types: Dict[str, str] = field(default_factory=dict)
@@ -166,7 +166,7 @@ class FeatureMetadata:
     removed_features: List[str] = field(default_factory=list)
     
     def to_dict(self) -> Dict[str, Any]:
-        """Конвертация в словарь"""
+        """Convert to dictionary"""
         return {
             'feature_names': self.feature_names,
             'feature_types': self.feature_types,
@@ -179,7 +179,7 @@ class FeatureMetadata:
 
 
 class BaseFeatureGenerator(ABC):
-    """Базовый класс для генераторов признаков - enterprise pattern"""
+    """Base class for feature generators - enterprise pattern"""
     
     @abstractmethod
     def generate_features(
@@ -187,43 +187,43 @@ class BaseFeatureGenerator(ABC):
         data: pd.DataFrame, 
         target: Optional[pd.Series] = None
     ) -> pd.DataFrame:
-        """Генерация признаков"""
+        """Generate features"""
         pass
-    
+
     @abstractmethod
     def get_feature_names(self) -> List[str]:
-        """Получение имен созданных признаков"""
+        """Get names of created features"""
         pass
-    
+
     @abstractmethod
     def get_feature_types(self) -> Dict[str, str]:
-        """Получение типов признаков"""
+        """Get feature types"""
         pass
 
 
 class FeatureEngineer(BaseEstimator, TransformerMixin):
     """
-    Продвинутый Feature Engineer для XGBoost моделей
-    
-    Реализует enterprise patterns:
-    - Модульная архитектура с подключаемыми генераторами
-    - Кэширование для производительности
-    - Параллельная обработка данных
-    - Валидация и мониторинг качества данных
-    - Автоматическая оптимизация для tree моделей
+    Advanced Feature Engineer for XGBoost models
+
+    Implements enterprise patterns:
+    - Modular architecture with pluggable generators
+    - Caching for performance
+    - Parallel data processing
+    - Data quality validation and monitoring
+    - Automatic optimization for tree-based models
     """
     
     def __init__(self, config: Optional[FeatureConfig] = None):
         self.config = config or FeatureConfig()
         
-        # Состояние объекта
+        # Object state
         self.feature_generators_: List[BaseFeatureGenerator] = []
         self.scalers_: Dict[str, Any] = {}
         self.feature_selector_: Optional[Any] = None
         self.metadata_: FeatureMetadata = FeatureMetadata()
         self.is_fitted_: bool = False
         
-        # Кэширование
+        # Caching
         self._feature_cache: Dict[str, pd.DataFrame] = {}
         self._stats_cache: Dict[str, Dict[str, Any]] = {}
         
@@ -232,7 +232,7 @@ class FeatureEngineer(BaseEstimator, TransformerMixin):
         self._initialize_generators()
     
     def _setup_logging(self):
-        """Настройка логирования"""
+        """Set up logging"""
         logger.add(
             f"logs/feature_engineer_{datetime.now():%Y%m%d}.log",
             rotation="daily",
@@ -241,18 +241,18 @@ class FeatureEngineer(BaseEstimator, TransformerMixin):
         )
     
     def _initialize_generators(self):
-        """Инициализация генераторов признаков"""
-        
-        logger.info("🔧 Инициализация генераторов признаков...")
-        
-        # Импортируем генераторы
+        """Initialize feature generators"""
+
+        logger.info("🔧 Initializing feature generators...")
+
+        # Import generators
         from .technical_indicators import TechnicalIndicators
         from .statistical_features import StatisticalFeatures
         from .lagging_features import LaggingFeatures
         from .interaction_features import InteractionFeatures
         from .volatility_features import VolatilityFeatures
         
-        # Создаем генераторы на основе конфигурации
+        # Create generators based on configuration
         if self.config.enable_technical_indicators:
             self.feature_generators_.append(TechnicalIndicators(self.config))
         
@@ -268,33 +268,33 @@ class FeatureEngineer(BaseEstimator, TransformerMixin):
         if self.config.enable_volatility_features:
             self.feature_generators_.append(VolatilityFeatures(self.config))
         
-        logger.info(f"✅ Инициализировано {len(self.feature_generators_)} генераторов")
+        logger.info(f"✅ Initialized {len(self.feature_generators_)} generators")
     
     def _validate_input_data(self, X: pd.DataFrame) -> pd.DataFrame:
-        """Валидация и очистка входных данных"""
-        
-        logger.info("🔍 Валидация входных данных...")
+        """Validate and clean input data"""
+
+        logger.info("🔍 Validating input data...")
         
         X = X.copy()
         
-        # Проверка на пустые данные
+        # Check for empty data
         if X.empty:
-            raise ValueError("Входные данные пусты")
-        
-        # Проверка на дублированные колонки
+            raise ValueError("Input data is empty")
+
+        # Check for duplicate columns
         if X.columns.duplicated().any():
-            logger.warning("⚠️ Найдены дублированные колонки, удаляем...")
+            logger.warning("⚠️ Duplicate columns found, removing...")
             X = X.loc[:, ~X.columns.duplicated()]
         
-        # Обработка пропущенных значений
+        # Handle missing values
         missing_ratio = X.isnull().sum() / len(X)
         high_missing_cols = missing_ratio[missing_ratio > 0.5].index.tolist()
         
         if high_missing_cols:
-            logger.warning(f"⚠️ Удаляем колонки с >50% пропусков: {high_missing_cols}")
+            logger.warning(f"⚠️ Removing columns with >50% missing values: {high_missing_cols}")
             X = X.drop(columns=high_missing_cols)
         
-        # Обработка оставшихся пропусков
+        # Handle remaining missing values
         if self.config.handle_missing == "forward_fill":
             X = X.fillna(method='ffill').fillna(method='bfill')
         elif self.config.handle_missing == "interpolate":
@@ -302,16 +302,16 @@ class FeatureEngineer(BaseEstimator, TransformerMixin):
         elif self.config.handle_missing == "drop":
             X = X.dropna()
         
-        # Обработка inf значений
+        # Handle inf values
         X = X.replace([np.inf, -np.inf], np.nan)
         X = X.fillna(X.median())
         
-        logger.info(f"✅ Данные валидированы: {X.shape}")
+        logger.info(f"✅ Data validated: {X.shape}")
         
         return X
     
     def _detect_feature_types(self, X: pd.DataFrame) -> Dict[str, str]:
-        """Автоматическое определение типов признаков"""
+        """Automatically detect feature types"""
         
         feature_types = {}
         
@@ -337,12 +337,12 @@ class FeatureEngineer(BaseEstimator, TransformerMixin):
         return feature_types
     
     def _remove_outliers(self, X: pd.DataFrame) -> pd.DataFrame:
-        """Удаление выбросов"""
+        """Remove outliers"""
         
         if not self.config.remove_outliers:
             return X
         
-        logger.info(f"🧹 Удаление выбросов методом {self.config.outlier_method}...")
+        logger.info(f"🧹 Removing outliers using {self.config.outlier_method} method...")
         
         X_clean = X.copy()
         numerical_cols = X.select_dtypes(include=[np.number]).columns
@@ -367,7 +367,7 @@ class FeatureEngineer(BaseEstimator, TransformerMixin):
                     median_val = X[col].median()
                     X_clean.loc[threshold_indices, col] = median_val
         
-        logger.info("✅ Выбросы обработаны")
+        logger.info("✅ Outliers processed")
         
         return X_clean
     
@@ -376,14 +376,14 @@ class FeatureEngineer(BaseEstimator, TransformerMixin):
         X: pd.DataFrame, 
         y: Optional[pd.Series] = None
     ) -> pd.DataFrame:
-        """Создание базовых признаков всеми генераторами"""
+        """Create base features using all generators"""
+
+        logger.info("🏗️ Creating features...")
         
-        logger.info("🏗️ Создание признаков...")
-        
-        all_features = [X]  # Начинаем с оригинальных признаков
+        all_features = [X]  # Start with original features
         
         if self.config.parallel_processing:
-            # Параллельная генерация признаков
+            # Parallel feature generation
             with ThreadPoolExecutor(max_workers=self.config.max_workers) as executor:
                 
                 future_to_generator = {
@@ -398,7 +398,7 @@ class FeatureEngineer(BaseEstimator, TransformerMixin):
                     TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
                 ) as progress:
                     
-                    task = progress.add_task("Генерация признаков...", total=len(self.feature_generators_))
+                    task = progress.add_task("Generating features...", total=len(self.feature_generators_))
                     
                     for future in as_completed(future_to_generator):
                         generator = future_to_generator[future]
@@ -408,21 +408,21 @@ class FeatureEngineer(BaseEstimator, TransformerMixin):
                             if features is not None and not features.empty:
                                 all_features.append(features)
                                 
-                                # Обновляем метаданные
+                                # Update metadata
                                 gen_feature_names = generator.get_feature_names()
                                 gen_feature_types = generator.get_feature_types()
                                 
                                 self.metadata_.feature_names.extend(gen_feature_names)
                                 self.metadata_.feature_types.update(gen_feature_types)
                                 
-                            logger.info(f"✅ {generator.__class__.__name__}: {len(features.columns) if features is not None else 0} признаков")
-                            
+                            logger.info(f"✅ {generator.__class__.__name__}: {len(features.columns) if features is not None else 0} features")
+
                         except Exception as e:
-                            logger.error(f"❌ Ошибка в {generator.__class__.__name__}: {e}")
+                            logger.error(f"❌ Error in {generator.__class__.__name__}: {e}")
                         
                         progress.advance(task)
         else:
-            # Последовательная генерация
+            # Sequential generation
             for generator in self.feature_generators_:
                 try:
                     features = generator.generate_features(X, y)
@@ -435,31 +435,31 @@ class FeatureEngineer(BaseEstimator, TransformerMixin):
                         self.metadata_.feature_names.extend(gen_feature_names)
                         self.metadata_.feature_types.update(gen_feature_types)
                         
-                    logger.info(f"✅ {generator.__class__.__name__}: {len(features.columns) if features is not None else 0} признаков")
-                    
+                    logger.info(f"✅ {generator.__class__.__name__}: {len(features.columns) if features is not None else 0} features")
+
                 except Exception as e:
-                    logger.error(f"❌ Ошибка в {generator.__class__.__name__}: {e}")
+                    logger.error(f"❌ Error in {generator.__class__.__name__}: {e}")
         
-        # Объединяем все признаки
+        # Combine all features
         if len(all_features) > 1:
             X_features = pd.concat(all_features, axis=1)
             
-            # Удаляем дублированные колонки
+            # Remove duplicate columns
             X_features = X_features.loc[:, ~X_features.columns.duplicated()]
         else:
             X_features = X
         
-        logger.info(f"🎯 Создано {len(X_features.columns)} признаков (было {len(X.columns)})")
+        logger.info(f"🎯 Created {len(X_features.columns)} features (was {len(X.columns)})")
         
         return X_features
     
     def _apply_scaling(self, X: pd.DataFrame) -> pd.DataFrame:
-        """Применение масштабирования данных"""
+        """Apply data scaling"""
         
         if self.config.scaling_method == ScalingMethod.NONE:
             return X
         
-        logger.info(f"📏 Применение масштабирования: {self.config.scaling_method.value}")
+        logger.info(f"📏 Applying scaling: {self.config.scaling_method.value}")
         
         X_scaled = X.copy()
         numerical_cols = X.select_dtypes(include=[np.number]).columns
@@ -491,18 +491,18 @@ class FeatureEngineer(BaseEstimator, TransformerMixin):
         return X_scaled
     
     def _apply_binning(self, X: pd.DataFrame) -> pd.DataFrame:
-        """Применение binning для categorical features"""
+        """Apply binning for categorical features"""
         
         if not self.config.enable_binning:
             return X
         
-        logger.info("🗂️ Применение binning для categorical features...")
+        logger.info("🗂️ Applying binning for categorical features...")
         
         X_binned = X.copy()
         numerical_cols = X.select_dtypes(include=[np.number]).columns
         
         for col in numerical_cols:
-            # Создаем binned версии numerical features
+            # Create binned versions of numerical features
             try:
                 if self.config.binning_strategy == "quantile":
                     X_binned[f'{col}_binned'] = pd.qcut(
@@ -514,7 +514,7 @@ class FeatureEngineer(BaseEstimator, TransformerMixin):
                     )
                 
             except Exception as e:
-                logger.warning(f"⚠️ Не удалось применить binning к {col}: {e}")
+                logger.warning(f"⚠️ Failed to apply binning to {col}: {e}")
         
         return X_binned
     
@@ -523,14 +523,14 @@ class FeatureEngineer(BaseEstimator, TransformerMixin):
         X: pd.DataFrame, 
         y: Optional[pd.Series] = None
     ) -> pd.DataFrame:
-        """Отбор наиболее важных признаков"""
+        """Select most important features"""
         
         if not self.config.enable_feature_selection or y is None:
             return X
         
-        logger.info(f"🎯 Отбор признаков методом {self.config.feature_selection_method}...")
+        logger.info(f"🎯 Selecting features using {self.config.feature_selection_method} method...")
         
-        # Удаление признаков с низкой дисперсией
+        # Remove features with low variance
         variance_selector = VarianceThreshold(threshold=self.config.variance_threshold)
         X_variance_selected = pd.DataFrame(
             variance_selector.fit_transform(X),
@@ -540,10 +540,10 @@ class FeatureEngineer(BaseEstimator, TransformerMixin):
         
         removed_by_variance = set(X.columns) - set(X_variance_selected.columns)
         if removed_by_variance:
-            logger.info(f"🗑️ Удалено по variance threshold: {len(removed_by_variance)} признаков")
+            logger.info(f"🗑️ Removed by variance threshold: {len(removed_by_variance)} features")
             self.metadata_.removed_features.extend(list(removed_by_variance))
         
-        # Основной feature selection
+        # Main feature selection
         if self.config.feature_selection_method == "mutual_info":
             if y.dtype == 'object' or y.nunique() < 10:
                 selector = SelectKBest(
@@ -576,27 +576,27 @@ class FeatureEngineer(BaseEstimator, TransformerMixin):
             index=X.index
         )
         
-        # Обновляем метаданные
+        # Update metadata
         selected_features = list(X_selected.columns)
         removed_features = set(X_variance_selected.columns) - set(selected_features)
         
         self.metadata_.selected_features = selected_features
         self.metadata_.removed_features.extend(list(removed_features))
         
-        # Сохраняем важность признаков
+        # Save feature importance
         if hasattr(selector, 'scores_'):
             for i, feature in enumerate(X_variance_selected.columns):
                 if selector.get_support()[i]:
                     self.metadata_.feature_importance[feature] = selector.scores_[i]
         
-        logger.info(f"✅ Отобрано {len(selected_features)} из {len(X.columns)} признаков")
+        logger.info(f"✅ Selected {len(selected_features)} out of {len(X.columns)} features")
         
         return X_selected
     
     def _calculate_feature_stats(self, X: pd.DataFrame):
-        """Вычисление статистик по признакам"""
-        
-        logger.info("📊 Вычисление статистик признаков...")
+        """Calculate feature statistics"""
+
+        logger.info("📊 Calculating feature statistics...")
         
         for col in X.columns:
             stats_dict = {
@@ -627,57 +627,57 @@ class FeatureEngineer(BaseEstimator, TransformerMixin):
         y: Optional[Union[pd.Series, np.ndarray]] = None
     ) -> 'FeatureEngineer':
         """
-        Обучение feature engineer
-        
+        Fit the feature engineer
+
         Args:
-            X: Исходные данные
-            y: Целевая переменная (опционально)
+            X: Input data
+            y: Target variable (optional)
         """
-        
+
         start_time = time.time()
-        logger.info("🚀 Начало обучения Feature Engineer...")
-        
-        # Конвертация в DataFrame если нужно
+        logger.info("🚀 Starting Feature Engineer fitting...")
+
+        # Convert to DataFrame if needed
         if isinstance(X, np.ndarray):
             X = pd.DataFrame(X, columns=[f'feature_{i}' for i in range(X.shape[1])])
         
         if isinstance(y, np.ndarray):
             y = pd.Series(y, name='target')
         
-        # Валидация данных
+        # Data validation
         X = self._validate_input_data(X)
-        
-        # Определение типов признаков
+
+        # Detect feature types
         base_feature_types = self._detect_feature_types(X)
         self.metadata_.feature_types.update(base_feature_types)
         
-        # Удаление выбросов
+        # Remove outliers
         X = self._remove_outliers(X)
-        
-        # Создание признаков
+
+        # Create features
         X_features = self._create_base_features(X, y)
-        
-        # Применение binning
+
+        # Apply binning
         X_features = self._apply_binning(X_features)
-        
-        # Масштабирование
+
+        # Scaling
         X_features = self._apply_scaling(X_features)
-        
-        # Отбор признаков
+
+        # Feature selection
         X_final = self._select_features(X_features, y)
-        
-        # Вычисление статистик
+
+        # Calculate statistics
         self._calculate_feature_stats(X_final)
         
-        # Корреляционная матрица
-        if len(X_final.columns) <= 100:  # Ограничиваем для производительности
+        # Correlation matrix
+        if len(X_final.columns) <= 100:  # Limit for performance
             self.metadata_.correlation_matrix = X_final.corr()
         
         self.is_fitted_ = True
         
         training_time = time.time() - start_time
-        logger.info(f"✅ Feature Engineer обучен за {training_time:.2f}с")
-        logger.info(f"📊 Итого признаков: {len(X_final.columns)}")
+        logger.info(f"✅ Feature Engineer fitted in {training_time:.2f}s")
+        logger.info(f"📊 Total features: {len(X_final.columns)}")
         
         self._display_summary()
         
@@ -685,40 +685,40 @@ class FeatureEngineer(BaseEstimator, TransformerMixin):
     
     def transform(self, X: Union[pd.DataFrame, np.ndarray]) -> pd.DataFrame:
         """
-        Применение feature engineering к новым данным
-        
+        Apply feature engineering to new data
+
         Args:
-            X: Новые данные
-            
+            X: New data
+
         Returns:
-            Трансформированные данные
+            Transformed data
         """
-        
+
         if not self.is_fitted_:
-            raise ValueError("Feature Engineer не обучен. Вызовите fit() сначала.")
-        
-        # Конвертация в DataFrame если нужно
+            raise ValueError("Feature Engineer is not fitted. Call fit() first.")
+
+        # Convert to DataFrame if needed
         if isinstance(X, np.ndarray):
             X = pd.DataFrame(X, columns=[f'feature_{i}' for i in range(X.shape[1])])
         
-        # Валидация данных
+        # Data validation
         X = self._validate_input_data(X)
-        
-        # Удаление выбросов
+
+        # Remove outliers
         X = self._remove_outliers(X)
-        
-        # Создание признаков (без target)
+
+        # Create features (without target)
         X_features = self._create_base_features(X, y=None)
         
-        # Применение binning
+        # Apply binning
         X_features = self._apply_binning(X_features)
-        
-        # Масштабирование
+
+        # Scaling
         X_features = self._apply_scaling(X_features)
-        
-        # Отбор признаков (применяем уже обученный selector)
+
+        # Feature selection (apply already fitted selector)
         if self.feature_selector_ is not None:
-            # Берем только те колонки, которые были в обучении
+            # Take only columns that were present during fitting
             available_features = [col for col in self.metadata_.selected_features if col in X_features.columns]
             X_final = X_features[available_features]
         else:
@@ -731,39 +731,39 @@ class FeatureEngineer(BaseEstimator, TransformerMixin):
         X: Union[pd.DataFrame, np.ndarray], 
         y: Optional[Union[pd.Series, np.ndarray]] = None
     ) -> pd.DataFrame:
-        """Обучение и трансформация за один вызов"""
+        """Fit and transform in a single call"""
         
         self.fit(X, y)
         return self.transform(X)
     
     def _display_summary(self):
-        """Отображение summary результатов"""
+        """Display results summary"""
         
         table = Table(title="🎯 FEATURE ENGINEERING SUMMARY")
         
-        table.add_column("Метрика", style="cyan")
-        table.add_column("Значение", style="green")
-        
-        table.add_row("Всего признаков", str(len(self.metadata_.feature_names)))
-        table.add_row("Отобрано признаков", str(len(self.metadata_.selected_features)))
-        table.add_row("Удалено признаков", str(len(self.metadata_.removed_features)))
-        table.add_row("Генераторов активно", str(len(self.feature_generators_)))
-        
-        # Статистика по типам признаков
+        table.add_column("Metric", style="cyan")
+        table.add_column("Value", style="green")
+
+        table.add_row("Total features", str(len(self.metadata_.feature_names)))
+        table.add_row("Selected features", str(len(self.metadata_.selected_features)))
+        table.add_row("Removed features", str(len(self.metadata_.removed_features)))
+        table.add_row("Active generators", str(len(self.feature_generators_)))
+
+        # Statistics by feature type
         type_counts = {}
         for feature_type in self.metadata_.feature_types.values():
             type_counts[feature_type] = type_counts.get(feature_type, 0) + 1
         
         for ftype, count in type_counts.items():
-            table.add_row(f"Тип {ftype}", str(count))
+            table.add_row(f"Type {ftype}", str(count))
         
         self.console.print(table)
     
     def get_feature_importance(self, top_k: Optional[int] = None) -> pd.DataFrame:
-        """Получение важности признаков"""
-        
+        """Get feature importance"""
+
         if not self.metadata_.feature_importance:
-            logger.warning("⚠️ Важность признаков не вычислена")
+            logger.warning("⚠️ Feature importance not calculated")
             return pd.DataFrame()
         
         importance_df = pd.DataFrame([
@@ -781,14 +781,14 @@ class FeatureEngineer(BaseEstimator, TransformerMixin):
         top_k: int = 20,
         save_path: Optional[str] = None
     ):
-        """Визуализация важности признаков"""
+        """Visualize feature importance"""
         
         importance_df = self.get_feature_importance(top_k)
         
         if importance_df.empty:
-            logger.warning("⚠️ Нет данных о важности признаков")
+            logger.warning("⚠️ No feature importance data available")
             return
-        
+
         fig, ax = plt.subplots(figsize=(12, 8))
         
         bars = ax.barh(
@@ -804,7 +804,7 @@ class FeatureEngineer(BaseEstimator, TransformerMixin):
         ax.set_title(f'Top {top_k} Feature Importance')
         ax.grid(True, alpha=0.3)
         
-        # Добавление значений
+        # Add values
         for i, bar in enumerate(bars):
             width = bar.get_width()
             ax.text(width, bar.get_y() + bar.get_height()/2,
@@ -814,7 +814,7 @@ class FeatureEngineer(BaseEstimator, TransformerMixin):
         
         if save_path:
             plt.savefig(save_path, dpi=300, bbox_inches='tight')
-            logger.info(f"📊 График важности признаков сохранен: {save_path}")
+            logger.info(f"📊 Feature importance plot saved: {save_path}")
         else:
             plt.show()
     
@@ -823,10 +823,10 @@ class FeatureEngineer(BaseEstimator, TransformerMixin):
         features: Optional[List[str]] = None,
         save_path: Optional[str] = None
     ):
-        """Тепловая карта корреляций"""
-        
+        """Correlation heatmap"""
+
         if self.metadata_.correlation_matrix is None:
-            logger.warning("⚠️ Корреляционная матрица не вычислена")
+            logger.warning("⚠️ Correlation matrix not calculated")
             return
         
         corr_matrix = self.metadata_.correlation_matrix
@@ -851,17 +851,17 @@ class FeatureEngineer(BaseEstimator, TransformerMixin):
         
         if save_path:
             plt.savefig(save_path, dpi=300, bbox_inches='tight')
-            logger.info(f"📊 Корреляционная матрица сохранена: {save_path}")
+            logger.info(f"📊 Correlation matrix saved: {save_path}")
         else:
             plt.show()
     
     def save_engineer(self, path: Union[str, Path]):
-        """Сохранение feature engineer"""
+        """Save feature engineer"""
         
         path = Path(path)
         path.mkdir(parents=True, exist_ok=True)
         
-        # Сохранение конфигурации
+        # Save configuration
         config_dict = {
             'enable_technical_indicators': self.config.enable_technical_indicators,
             'enable_statistical_features': self.config.enable_statistical_features,
@@ -872,69 +872,69 @@ class FeatureEngineer(BaseEstimator, TransformerMixin):
             'statistical_windows': self.config.statistical_windows,
             'max_lags': self.config.max_lags,
             'scaling_method': self.config.scaling_method.value,
-            # ... добавить другие параметры
+            # ... add other parameters
         }
         
         with open(path / "config.json", 'w') as f:
             json.dump(config_dict, f, indent=2)
         
-        # Сохранение метаданных
+        # Save metadata
         with open(path / "metadata.json", 'w') as f:
             json.dump(self.metadata_.to_dict(), f, indent=2, default=str)
-        
-        # Сохранение скейлеров
+
+        # Save scalers
         if self.scalers_:
             joblib.dump(self.scalers_, path / "scalers.pkl")
         
-        # Сохранение feature selector
+        # Save feature selector
         if self.feature_selector_:
             joblib.dump(self.feature_selector_, path / "feature_selector.pkl")
-        
-        logger.info(f"💾 Feature Engineer сохранен в {path}")
+
+        logger.info(f"💾 Feature Engineer saved to {path}")
     
     @classmethod
     def load_engineer(cls, path: Union[str, Path]) -> 'FeatureEngineer':
-        """Загрузка feature engineer"""
+        """Load feature engineer"""
         
         path = Path(path)
         
-        # Загрузка конфигурации
+        # Load configuration
         with open(path / "config.json", 'r') as f:
             config_dict = json.load(f)
         
-        # Создание конфигурации
+        # Create configuration
         config = FeatureConfig(**config_dict)
-        
-        # Создание экземпляра
+
+        # Create instance
         engineer = cls(config)
         
-        # Загрузка метаданных
+        # Load metadata
         with open(path / "metadata.json", 'r') as f:
             metadata_dict = json.load(f)
         
         engineer.metadata_ = FeatureMetadata(**metadata_dict)
         
-        # Загрузка скейлеров
+        # Load scalers
         scalers_path = path / "scalers.pkl"
         if scalers_path.exists():
             engineer.scalers_ = joblib.load(scalers_path)
         
-        # Загрузка feature selector
+        # Load feature selector
         selector_path = path / "feature_selector.pkl"
         if selector_path.exists():
             engineer.feature_selector_ = joblib.load(selector_path)
         
         engineer.is_fitted_ = True
         
-        logger.info(f"📂 Feature Engineer загружен из {path}")
+        logger.info(f"📂 Feature Engineer loaded from {path}")
         
         return engineer
 
 
-# Utility functions для быстрых вычислений
+# Utility functions for fast computations
 @jit(nopython=True, parallel=True)
 def fast_rolling_mean(data: np.ndarray, window: int) -> np.ndarray:
-    """Быстрое вычисление скользящего среднего"""
+    """Fast rolling mean calculation"""
     
     n = len(data)
     result = np.empty(n)
@@ -950,7 +950,7 @@ def fast_rolling_mean(data: np.ndarray, window: int) -> np.ndarray:
 
 @jit(nopython=True)
 def fast_percentage_change(data: np.ndarray) -> np.ndarray:
-    """Быстрое вычисление процентного изменения"""
+    """Fast percentage change calculation"""
     
     n = len(data)
     result = np.empty(n)
@@ -966,15 +966,15 @@ def fast_percentage_change(data: np.ndarray) -> np.ndarray:
 
 
 if __name__ == "__main__":
-    # Пример использования
-    logger.info("🧪 Тестирование Feature Engineer...")
-    
-    # Создание синтетических данных
+    # Usage example
+    logger.info("🧪 Testing Feature Engineer...")
+
+    # Create synthetic data
     np.random.seed(42)
     n_samples = 1000
     dates = pd.date_range('2023-01-01', periods=n_samples, freq='1H')
     
-    # Синтетические данные о цене временных рядовы
+    # Synthetic time series price data
     price_data = pd.DataFrame(index=dates)
     price_data['open'] = 100 + np.cumsum(np.random.randn(n_samples) * 0.01)
     price_data['high'] = price_data['open'] + np.random.exponential(0.5, n_samples)
@@ -982,30 +982,30 @@ if __name__ == "__main__":
     price_data['close'] = price_data['open'] + np.random.randn(n_samples) * 0.5
     price_data['volume'] = np.random.exponential(1000, n_samples)
     
-    # Целевая переменная - будущее изменение цены
+    # Target variable - future price change
     target = price_data['close'].pct_change(periods=5).shift(-5)  # 5-period forward return
     
-    # Создание feature engineer
+    # Create feature engineer
     config = FeatureConfig(
         enable_technical_indicators=True,
         enable_statistical_features=True,
         enable_lag_features=True,
-        enable_interaction_features=False,  # Отключаем для быстроты
+        enable_interaction_features=False,  # Disabled for speed
         enable_volatility_features=True,
         feature_selection_k=50
     )
     
     engineer = FeatureEngineer(config)
     
-    # Обучение и трансформация
+    # Fit and transform
     X_transformed = engineer.fit_transform(price_data, target.dropna())
     
-    logger.info(f"📊 Исходных признаков: {len(price_data.columns)}")
-    logger.info(f"📊 Создано признаков: {len(X_transformed.columns)}")
-    
-    # Важность признаков
+    logger.info(f"📊 Original features: {len(price_data.columns)}")
+    logger.info(f"📊 Created features: {len(X_transformed.columns)}")
+
+    # Feature importance
     importance = engineer.get_feature_importance(top_k=10)
     if not importance.empty:
-        logger.info(f"🎯 Топ-3 признака: {importance['feature'].iloc[:3].tolist()}")
-    
-    logger.info("✅ Тестирование Feature Engineer завершено!")
+        logger.info(f"🎯 Top-3 features: {importance['feature'].iloc[:3].tolist()}")
+
+    logger.info("✅ Feature Engineer testing completed!")

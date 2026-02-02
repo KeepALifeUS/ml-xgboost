@@ -14,7 +14,7 @@ from .feature_engineer import BaseFeatureGenerator, FeatureType
 
 
 class StatFeatureType(Enum):
-    """Типы статистических признаков"""
+    """Types of statistical features"""
     MOMENTS = "moments"
     QUANTILES = "quantiles"
     ENTROPY = "entropy"
@@ -22,14 +22,14 @@ class StatFeatureType(Enum):
 
 @dataclass
 class StatisticalConfig:
-    """Конфигурация статистических признаков"""
+    """Statistical features configuration"""
     windows: List[int] = field(default_factory=lambda: [5, 10, 20, 50])
     enable_moments: bool = True
     enable_quantiles: bool = True
 
 
 class StatisticalFeatures(BaseFeatureGenerator):
-    """Генератор статистических признаков"""
+    """Statistical features generator"""
     
     def __init__(self, feature_config, statistical_config: Optional[StatisticalConfig] = None):
         self.feature_config = feature_config
@@ -38,7 +38,7 @@ class StatisticalFeatures(BaseFeatureGenerator):
         self.feature_types_: Dict[str, str] = {}
     
     def generate_features(self, data: pd.DataFrame, target: Optional[pd.Series] = None) -> pd.DataFrame:
-        """Генерация статистических признаков"""
+        """Generate statistical features"""
         features = {}
         numerical_cols = data.select_dtypes(include=[np.number]).columns
         

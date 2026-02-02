@@ -66,7 +66,7 @@ from plotly.subplots import make_subplots
 
 
 class OptimizationObjective(Enum):
-    """Цели оптимизации для временных рядов"""
+    """Optimization objectives for time series"""
     
     # Regression objectives
     MINIMIZE_RMSE = "minimize_rmse"
@@ -94,7 +94,7 @@ class OptimizationObjective(Enum):
 
 
 class TuningStrategy(Enum):
-    """Стратегии поиска гиперпараметров"""
+    """Hyperparameter search strategies"""
     OPTUNA_TPE = "optuna_tpe"  # Tree-structured Parzen Estimator
     OPTUNA_CMAES = "optuna_cmaes"  # CMA-ES
     BAYESIAN_GP = "bayesian_gp"  # Gaussian Process
@@ -107,7 +107,7 @@ class TuningStrategy(Enum):
 
 @dataclass
 class ParameterSpace:
-    """Определение пространства параметров для оптимизации"""
+    """Parameter space definition for optimization"""
     
     # Tree structure parameters
     n_estimators: Tuple[int, int] = (50, 2000)
@@ -138,7 +138,7 @@ class ParameterSpace:
     grow_policy: List[str] = field(default_factory=lambda: ['depthwise', 'lossguide'])
     
     def to_optuna_space(self, trial: optuna.Trial) -> Dict[str, Any]:
-        """Конвертация в Optuna search space"""
+        """Convert to Optuna search space"""
         
         params = {
             'n_estimators': trial.suggest_int('n_estimators', *self.n_estimators),
@@ -163,7 +163,7 @@ class ParameterSpace:
         return params
     
     def to_skopt_space(self) -> List[Any]:
-        """Конвертация в scikit-optimize search space"""
+        """Convert to scikit-optimize search space"""
         
         space = [
             Integer(*self.n_estimators, name='n_estimators'),
@@ -186,9 +186,9 @@ class ParameterSpace:
 
 @dataclass
 class TuningConfig:
-    """Конфигурация hyperparameter tuning"""
-    
-    # Основные параметры
+    """Hyperparameter tuning configuration"""
+
+    # Main parameters
     strategy: TuningStrategy = TuningStrategy.OPTUNA_TPE
     objective: OptimizationObjective = OptimizationObjective.MINIMIZE_RMSE
     n_trials: int = 100
@@ -199,13 +199,13 @@ class TuningConfig:
     cv_strategy: str = "time_series"  # time_series, stratified, kfold
     scoring_metric: Optional[str] = None
     
-    # Оптимизация производительности
+    # Performance optimization
     n_jobs: int = -1
     enable_distributed: bool = False
     storage_url: Optional[str] = None  # For distributed Optuna
     study_name: Optional[str] = None
     
-    # Early stopping и pruning
+    # Early stopping and pruning
     enable_pruning: bool = True
     pruning_patience: int = 10
     min_trials_for_pruning: int = 5
@@ -213,16 +213,16 @@ class TuningConfig:
     # Parameter space
     parameter_space: Optional[ParameterSpace] = None
     
-    # Многоцелевая оптимизация
+    # Multi-objective optimization
     enable_multi_objective: bool = False
     secondary_objective: Optional[OptimizationObjective] = None
     objective_weights: Tuple[float, float] = (0.8, 0.2)
     
-    # Сохранение результатов
+    # Save results
     save_intermediate_results: bool = True
     results_dir: str = "tuning_results"
     
-    # Дополнительные опции
+    # Additional options
     enable_feature_selection: bool = False
     feature_selection_threshold: float = 0.01
     enable_ensemble_tuning: bool = False
@@ -234,38 +234,38 @@ class TuningConfig:
 
 @dataclass
 class TuningResult:
-    """Результат hyperparameter tuning"""
-    
-    # Лучшие параметры
+    """Hyperparameter tuning result"""
+
+    # Best parameters
     best_params: Dict[str, Any]
     best_score: float
     best_trial_number: int
     
-    # История оптимизации
+    # Optimization history
     optimization_history: List[Dict[str, Any]] = field(default_factory=list)
     parameter_importance: Dict[str, float] = field(default_factory=dict)
     
-    # Статистики
+    # Statistics
     total_trials: int = 0
     successful_trials: int = 0
     pruned_trials: int = 0
     failed_trials: int = 0
     tuning_time: float = 0.0
     
-    # Cross-validation результаты
+    # Cross-validation results
     cv_scores: List[float] = field(default_factory=list)
     cv_mean: float = 0.0
     cv_std: float = 0.0
     
-    # Multi-objective результаты
+    # Multi-objective results
     pareto_front: Optional[List[Tuple[float, float]]] = None
     
-    # Метаданные
+    # Metadata
     timestamp: datetime = field(default_factory=datetime.now)
     config: Optional[TuningConfig] = None
     
     def to_dict(self) -> Dict[str, Any]:
-        """Конвертация в словарь"""
+        """Convert to dictionary"""
         return {
             'best_params': self.best_params,
             'best_score': self.best_score,
@@ -286,7 +286,7 @@ class TuningResult:
 
 
 class BaseHyperparameterTuner(ABC):
-    """Базовый класс для настройщиков гиперпараметров - enterprise pattern"""
+    """Base class for hyperparameter tuners - enterprise pattern"""
     
     @abstractmethod
     def optimize(
@@ -296,46 +296,46 @@ class BaseHyperparameterTuner(ABC):
         y: pd.Series,
         config: TuningConfig
     ) -> TuningResult:
-        """Оптимизация гиперпараметров"""
+        """Optimize hyperparameters"""
         pass
-    
+
     @abstractmethod
     def get_tuner_name(self) -> str:
-        """Получение имени настройщика"""
+        """Get tuner name"""
         pass
 
 
 class HyperparameterTuner:
     """
-    Главный класс для оптимизации гиперпараметров XGBoost моделей
-    
-    Реализует enterprise patterns:
-    - Стратегия паттерн для разных алгоритмов оптимизации
-    - Фабричный паттерн для создания оптимизаторов
-    - Наблюдатель паттерн для мониторинга прогресса
-    - Команда паттерн для отменяемых операций
+    Main class for XGBoost model hyperparameter optimization
+
+    Implements enterprise patterns:
+    - Strategy pattern for different optimization algorithms
+    - Factory pattern for creating optimizers
+    - Observer pattern for progress monitoring
+    - Command pattern for cancellable operations
     """
     
     def __init__(self, config: Optional[TuningConfig] = None):
         self.config = config or TuningConfig()
         
-        # Внутреннее состояние
+        # Internal state
         self.current_study_: Optional[Any] = None
         self.optimization_callbacks_: List[Callable] = []
         self.results_history_: List[TuningResult] = []
         
-        # Кэширование
+        # Caching
         self._objective_cache: Dict[str, float] = {}
         self._model_cache: Dict[str, Any] = {}
         
-        # Параллельная обработка
+        # Parallel processing
         self._stop_optimization = threading.Event()
         
         self.console = Console()
         self._setup_logging()
     
     def _setup_logging(self):
-        """Настройка логирования"""
+        """Set up logging"""
         logger.add(
             f"logs/hyperparameter_tuning_{datetime.now():%Y%m%d}.log",
             rotation="daily",
@@ -344,7 +344,7 @@ class HyperparameterTuner:
         )
     
     def add_callback(self, callback: Callable[[optuna.Trial], None]):
-        """Добавление callback функции для мониторинга"""
+        """Add callback function for monitoring"""
         self.optimization_callbacks_.append(callback)
     
     def optimize(
@@ -356,30 +356,30 @@ class HyperparameterTuner:
         y_val: Optional[pd.Series] = None
     ) -> TuningResult:
         """
-        Оптимизация гиперпараметров
-        
+        Optimize hyperparameters
+
         Args:
-            model_class: Класс XGBoost модели
-            X: Обучающие данные
-            y: Целевая переменная
-            X_val: Валидационные данные
-            y_val: Валидационная целевая переменная
+            model_class: XGBoost model class
+            X: Training data
+            y: Target variable
+            X_val: Validation data
+            y_val: Validation target variable
         """
         
         start_time = time.time()
-        logger.info(f"🚀 Начало оптимизации гиперпараметров: {self.config.strategy.value}")
-        
-        # Создание директории для результатов
+        logger.info(f"🚀 Starting hyperparameter optimization: {self.config.strategy.value}")
+
+        # Create results directory
         results_dir = Path(self.config.results_dir)
         results_dir.mkdir(parents=True, exist_ok=True)
         
-        # Определение objective function
+        # Define objective function
         def objective(trial: optuna.Trial) -> float:
             return self._objective_function(
                 trial, model_class, X, y, X_val, y_val
             )
         
-        # Выбор стратегии оптимизации
+        # Choose optimization strategy
         if self.config.strategy == TuningStrategy.OPTUNA_TPE:
             result = self._optimize_with_optuna(objective, TPESampler())
         elif self.config.strategy == TuningStrategy.OPTUNA_CMAES:
@@ -391,22 +391,22 @@ class HyperparameterTuner:
         elif self.config.strategy == TuningStrategy.RANDOM_SEARCH:
             result = self._optimize_with_random_search(model_class, X, y, X_val, y_val)
         else:
-            raise ValueError(f"Неподдерживаемая стратегия: {self.config.strategy}")
-        
-        # Обновление времени оптимизации
+            raise ValueError(f"Unsupported strategy: {self.config.strategy}")
+
+        # Update optimization time
         result.tuning_time = time.time() - start_time
         result.config = self.config
         
-        # Сохранение результатов
+        # Save results
         if self.config.save_intermediate_results:
             self._save_results(result, results_dir)
         
-        # Добавление в историю
+        # Add to history
         self.results_history_.append(result)
         
-        logger.info(f"✅ Оптимизация завершена за {result.tuning_time:.2f}с")
-        
-        # Отображение результатов
+        logger.info(f"✅ Optimization completed in {result.tuning_time:.2f}s")
+
+        # Display results
         self._display_results(result)
         
         return result
@@ -421,30 +421,30 @@ class HyperparameterTuner:
         y_val: Optional[pd.Series]
     ) -> float:
         """
-        Objective function для оптимизации
-        
+        Objective function for optimization
+
         Args:
-            trial: Optuna trial объект
-            model_class: Класс модели
-            X, y: Обучающие данные
-            X_val, y_val: Валидационные данные
+            trial: Optuna trial object
+            model_class: Model class
+            X, y: Training data
+            X_val, y_val: Validation data
         """
         
         try:
-            # Генерация параметров для данного trial
+            # Generate parameters for this trial
             params = self.config.parameter_space.to_optuna_space(trial)
             
-            # Кэширование для ускорения
+            # Caching for acceleration
             params_key = str(sorted(params.items()))
             if params_key in self._objective_cache:
                 return self._objective_cache[params_key]
             
-            # Создание модели с параметрами
+            # Create model with parameters
             model = model_class(**params, random_state=42, n_jobs=1)
             
-            # Cross-validation или валидация на отдельном наборе
+            # Cross-validation or validation on a separate set
             if X_val is not None and y_val is not None:
-                # Валидация на отдельном наборе
+                # Validation on a separate set
                 model.fit(X, y)
                 predictions = model.predict(X_val)
                 score = self._calculate_score(y_val, predictions)
@@ -453,22 +453,22 @@ class HyperparameterTuner:
                 scores = self._cross_validate_model(model, X, y)
                 score = np.mean(scores)
             
-            # Кэширование результата
+            # Caching result
             self._objective_cache[params_key] = score
             
-            # Callback для мониторинга
+            # Callback for monitoring
             for callback in self.optimization_callbacks_:
                 callback(trial)
             
-            # Pruning для ранней остановки неперспективных trials
+            # Pruning for early stopping of unpromising trials
             if self.config.enable_pruning and trial.should_prune():
                 raise optuna.TrialPruned()
             
             return score
             
         except Exception as e:
-            logger.warning(f"⚠️ Ошибка в trial {trial.number}: {e}")
-            # Возвращаем плохой скор для неуспешных trials
+            logger.warning(f"⚠️ Error in trial {trial.number}: {e}")
+            # Return a bad score for unsuccessful trials
             if self._is_minimization_objective():
                 return float('inf')
             else:
@@ -479,9 +479,9 @@ class HyperparameterTuner:
         objective: Callable,
         sampler: optuna.samplers.BaseSampler
     ) -> TuningResult:
-        """Оптимизация с использованием Optuna"""
-        
-        # Настройка pruner
+        """Optimization using Optuna"""
+
+        # Configure pruner
         if self.config.enable_pruning:
             pruner = MedianPruner(
                 n_startup_trials=self.config.min_trials_for_pruning,
@@ -490,7 +490,7 @@ class HyperparameterTuner:
         else:
             pruner = optuna.pruners.NopPruner()
         
-        # Создание study
+        # Create study
         direction = "minimize" if self._is_minimization_objective() else "maximize"
         
         if self.config.storage_url and self.config.study_name:
@@ -521,7 +521,7 @@ class HyperparameterTuner:
             TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
         ) as progress:
             
-            task = progress.add_task("Оптимизация гиперпараметров...", total=self.config.n_trials)
+            task = progress.add_task("Optimizing hyperparameters...", total=self.config.n_trials)
             
             def progress_callback(study, trial):
                 progress.update(task, advance=1)
@@ -540,7 +540,7 @@ class HyperparameterTuner:
                 show_progress_bar=False
             )
         
-        # Создание результата
+        # Create result
         result = TuningResult(
             best_params=study.best_params,
             best_score=study.best_value,
@@ -551,7 +551,7 @@ class HyperparameterTuner:
             failed_trials=len([t for t in study.trials if t.state == optuna.trial.TrialState.FAIL]),
         )
         
-        # История оптимизации
+        # Optimization history
         result.optimization_history = [
             {
                 'trial_number': trial.number,
@@ -570,7 +570,7 @@ class HyperparameterTuner:
             importance = optuna.importance.get_param_importances(study)
             result.parameter_importance = importance
         except Exception as e:
-            logger.warning(f"⚠️ Не удалось вычислить важность параметров: {e}")
+            logger.warning(f"⚠️ Failed to calculate parameter importance: {e}")
         
         return result
     
@@ -583,7 +583,7 @@ class HyperparameterTuner:
         y_val: Optional[pd.Series],
         base_estimator: str = 'gp'
     ) -> TuningResult:
-        """Оптимизация с использованием scikit-optimize"""
+        """Optimization using scikit-optimize"""
         
         space = self.config.parameter_space.to_skopt_space()
         
@@ -603,10 +603,10 @@ class HyperparameterTuner:
                 return -score if not self._is_minimization_objective() else score
                 
             except Exception as e:
-                logger.warning(f"⚠️ Ошибка в skopt objective: {e}")
+                logger.warning(f"⚠️ Error in skopt objective: {e}")
                 return 1e10 if self._is_minimization_objective() else -1e10
         
-        # Оптимизация
+        # Optimization
         if base_estimator == 'gp':
             skopt_result = gp_minimize(
                 func=skopt_objective,
@@ -624,7 +624,7 @@ class HyperparameterTuner:
                 random_state=42
             )
         
-        # Конвертация результата
+        # Convert result
         best_params = {}
         for i, param_name in enumerate([dim.name for dim in space]):
             best_params[param_name] = skopt_result.x[i]
@@ -641,7 +641,7 @@ class HyperparameterTuner:
             failed_trials=0,
         )
         
-        # История оптимизации
+        # Optimization history
         result.optimization_history = [
             {
                 'trial_number': i,
@@ -661,7 +661,7 @@ class HyperparameterTuner:
         X_val: Optional[pd.DataFrame],
         y_val: Optional[pd.Series]
     ) -> TuningResult:
-        """Оптимизация случайным поиском"""
+        """Optimization using random search"""
         
         best_score = float('inf') if self._is_minimization_objective() else float('-inf')
         best_params = {}
@@ -681,7 +681,7 @@ class HyperparameterTuner:
             
             for trial_num in range(self.config.n_trials):
                 try:
-                    # Случайная генерация параметров
+                    # Random parameter generation
                     params = {
                         'n_estimators': np.random.randint(*param_space.n_estimators),
                         'max_depth': np.random.randint(*param_space.max_depth),
@@ -696,7 +696,7 @@ class HyperparameterTuner:
                         'tree_method': np.random.choice(param_space.tree_method),
                     }
                     
-                    # Оценка параметров
+                    # Evaluate parameters
                     model = model_class(**params, random_state=42, n_jobs=1)
                     
                     if X_val is not None and y_val is not None:
@@ -707,13 +707,13 @@ class HyperparameterTuner:
                         scores = self._cross_validate_model(model, X, y)
                         score = np.mean(scores)
                     
-                    # Проверка на лучший результат
+                    # Check for best result
                     if self._is_better_score(score, best_score):
                         best_score = score
                         best_params = params
                         best_trial_number = trial_num
                     
-                    # Добавление в историю
+                    # Add to history
                     history.append({
                         'trial_number': trial_num,
                         'value': score,
@@ -729,7 +729,7 @@ class HyperparameterTuner:
                     )
                 
                 except Exception as e:
-                    logger.warning(f"⚠️ Ошибка в random search trial {trial_num}: {e}")
+                    logger.warning(f"⚠️ Error in random search trial {trial_num}: {e}")
                     history.append({
                         'trial_number': trial_num,
                         'value': None,
@@ -756,15 +756,15 @@ class HyperparameterTuner:
         X: pd.DataFrame,
         y: pd.Series
     ) -> List[float]:
-        """Cross-validation модели"""
-        
-        # Выбор стратегии CV
+        """Cross-validate model"""
+
+        # Choose CV strategy
         if self.config.cv_strategy == "time_series":
             cv = TimeSeriesSplit(n_splits=self.config.cv_folds)
         else:
             cv = self.config.cv_folds
         
-        # Определение scoring metric
+        # Determine scoring metric
         if self.config.scoring_metric:
             scoring = self.config.scoring_metric
         else:
@@ -775,7 +775,7 @@ class HyperparameterTuner:
             model, X, y,
             cv=cv,
             scoring=scoring,
-            n_jobs=1,  # Чтобы избежать конфликтов в параллельной оптимизации
+            n_jobs=1,  # To avoid conflicts in parallel optimization
             error_score='raise'
         )
         
@@ -786,7 +786,7 @@ class HyperparameterTuner:
         y_true: pd.Series,
         y_pred: np.ndarray
     ) -> float:
-        """Вычисление скора на основе objective"""
+        """Calculate score based on objective"""
         
         if self.config.objective == OptimizationObjective.MINIMIZE_RMSE:
             return np.sqrt(mean_squared_error(y_true, y_pred))
@@ -802,11 +802,11 @@ class HyperparameterTuner:
             returns = pd.Series(y_pred).pct_change().fillna(0)
             return returns.mean() / returns.std() if returns.std() != 0 else 0
         else:
-            # Fallback к RMSE
+            # Fallback to RMSE
             return np.sqrt(mean_squared_error(y_true, y_pred))
     
     def _is_minimization_objective(self) -> bool:
-        """Проверка, является ли objective минимизационной"""
+        """Check if the objective is a minimization one"""
         minimization_objectives = {
             OptimizationObjective.MINIMIZE_RMSE,
             OptimizationObjective.MINIMIZE_MAE,
@@ -817,14 +817,14 @@ class HyperparameterTuner:
         return self.config.objective in minimization_objectives
     
     def _is_better_score(self, new_score: float, current_best: float) -> bool:
-        """Проверка, лучше ли новый скор"""
+        """Check if the new score is better"""
         if self._is_minimization_objective():
             return new_score < current_best
         else:
             return new_score > current_best
     
     def _get_default_scoring_metric(self) -> str:
-        """Получение метрики по умолчанию для CV"""
+        """Get default metric for CV"""
         
         if self.config.objective in [
             OptimizationObjective.MINIMIZE_RMSE,
@@ -841,27 +841,27 @@ class HyperparameterTuner:
             return 'neg_mean_squared_error'
     
     def _display_results(self, result: TuningResult):
-        """Отображение результатов оптимизации"""
-        
-        table = Table(title=f"🎯 РЕЗУЛЬТАТЫ ОПТИМИЗАЦИИ ГИПЕРПАРАМЕТРОВ")
-        table.add_column("Метрика", style="cyan")
-        table.add_column("Значение", style="green")
-        
-        table.add_row("Лучший скор", f"{result.best_score:.6f}")
-        table.add_row("Лучший trial", str(result.best_trial_number))
-        table.add_row("Всего trials", str(result.total_trials))
-        table.add_row("Успешных", str(result.successful_trials))
-        table.add_row("Обрезанных", str(result.pruned_trials))
-        table.add_row("Неудачных", str(result.failed_trials))
-        table.add_row("Время оптимизации", f"{result.tuning_time:.2f}с")
+        """Display optimization results"""
+
+        table = Table(title=f"🎯 HYPERPARAMETER OPTIMIZATION RESULTS")
+        table.add_column("Metric", style="cyan")
+        table.add_column("Value", style="green")
+
+        table.add_row("Best score", f"{result.best_score:.6f}")
+        table.add_row("Best trial", str(result.best_trial_number))
+        table.add_row("Total trials", str(result.total_trials))
+        table.add_row("Successful", str(result.successful_trials))
+        table.add_row("Pruned", str(result.pruned_trials))
+        table.add_row("Failed", str(result.failed_trials))
+        table.add_row("Optimization time", f"{result.tuning_time:.2f}s")
         
         self.console.print(table)
         
-        # Топ-5 параметров по важности
+        # Top-5 parameters by importance
         if result.parameter_importance:
-            importance_table = Table(title="📊 ВАЖНОСТЬ ПАРАМЕТРОВ")
-            importance_table.add_column("Параметр", style="cyan")
-            importance_table.add_column("Важность", style="green")
+            importance_table = Table(title="📊 PARAMETER IMPORTANCE")
+            importance_table.add_column("Parameter", style="cyan")
+            importance_table.add_column("Importance", style="green")
             
             sorted_importance = sorted(
                 result.parameter_importance.items(),
@@ -875,34 +875,34 @@ class HyperparameterTuner:
             self.console.print(importance_table)
     
     def _save_results(self, result: TuningResult, results_dir: Path):
-        """Сохранение результатов оптимизации"""
+        """Save optimization results"""
         
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         
-        # Сохранение основных результатов
+        # Save main results
         results_file = results_dir / f"tuning_results_{timestamp}.json"
         with open(results_file, 'w') as f:
             json.dump(result.to_dict(), f, indent=2, default=str)
         
-        # Сохранение лучших параметров отдельно
+        # Save best parameters separately
         params_file = results_dir / f"best_params_{timestamp}.json"
         with open(params_file, 'w') as f:
             json.dump(result.best_params, f, indent=2)
         
-        logger.info(f"💾 Результаты сохранены в {results_dir}")
+        logger.info(f"💾 Results saved to {results_dir}")
     
     def plot_optimization_history(
         self,
         result: TuningResult,
         save_path: Optional[str] = None
     ):
-        """Построение графика истории оптимизации"""
-        
+        """Plot optimization history"""
+
         if not result.optimization_history:
-            logger.warning("⚠️ Нет истории оптимизации для построения графика")
+            logger.warning("⚠️ No optimization history to plot")
             return
         
-        # Извлечение данных
+        # Extract data
         trial_numbers = []
         values = []
         
@@ -912,16 +912,16 @@ class HyperparameterTuner:
                 values.append(entry['value'])
         
         if not trial_numbers:
-            logger.warning("⚠️ Нет успешных trials для построения графика")
+            logger.warning("⚠️ No successful trials to plot")
             return
         
-        # Построение графика
+        # Create plot
         fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 10))
         
-        # История оптимизации
+        # Optimization history
         ax1.plot(trial_numbers, values, 'b-', alpha=0.6, label='Trial values')
         
-        # Лучший скор на каждом шаге
+        # Best score at each step
         best_so_far = []
         current_best = float('inf') if self._is_minimization_objective() else float('-inf')
         
@@ -937,7 +937,7 @@ class HyperparameterTuner:
         ax1.legend()
         ax1.grid(True, alpha=0.3)
         
-        # Распределение скоров
+        # Score distribution
         ax2.hist(values, bins=30, alpha=0.7, edgecolor='black')
         ax2.axvline(result.best_score, color='red', linestyle='--', 
                    label=f'Best Score: {result.best_score:.4f}')
@@ -951,7 +951,7 @@ class HyperparameterTuner:
         
         if save_path:
             plt.savefig(save_path, dpi=300, bbox_inches='tight')
-            logger.info(f"📊 График сохранен: {save_path}")
+            logger.info(f"📊 Plot saved: {save_path}")
         else:
             plt.show()
     
@@ -960,13 +960,13 @@ class HyperparameterTuner:
         result: TuningResult,
         save_path: Optional[str] = None
     ):
-        """Построение графика важности параметров"""
-        
+        """Plot parameter importance"""
+
         if not result.parameter_importance:
-            logger.warning("⚠️ Нет данных о важности параметров")
+            logger.warning("⚠️ No parameter importance data available")
             return
         
-        # Сортировка по важности
+        # Sort by importance
         sorted_importance = sorted(
             result.parameter_importance.items(),
             key=lambda x: x[1],
@@ -975,7 +975,7 @@ class HyperparameterTuner:
         
         params, importance = zip(*sorted_importance)
         
-        # Построение графика
+        # Create plot
         fig, ax = plt.subplots(figsize=(10, 6))
         
         bars = ax.barh(range(len(params)), importance, color='skyblue', alpha=0.7)
@@ -985,7 +985,7 @@ class HyperparameterTuner:
         ax.set_title('Hyperparameter Importance')
         ax.grid(True, alpha=0.3)
         
-        # Добавление значений на столбцы
+        # Add values to bars
         for i, bar in enumerate(bars):
             width = bar.get_width()
             ax.text(width, bar.get_y() + bar.get_height()/2,
@@ -995,7 +995,7 @@ class HyperparameterTuner:
         
         if save_path:
             plt.savefig(save_path, dpi=300, bbox_inches='tight')
-            logger.info(f"📊 График важности параметров сохранен: {save_path}")
+            logger.info(f"📊 Parameter importance plot saved: {save_path}")
         else:
             plt.show()
     
@@ -1004,7 +1004,7 @@ class HyperparameterTuner:
         model_class: Any,
         result: TuningResult
     ) -> Any:
-        """Создание модели с лучшими параметрами"""
+        """Create model with best parameters"""
         
         return model_class(**result.best_params, random_state=42)
     
@@ -1014,25 +1014,25 @@ class HyperparameterTuner:
         storage_url: str,
         additional_trials: int = 50
     ) -> TuningResult:
-        """Возобновление прерванной оптимизации"""
-        
-        # Загрузка существующего study
+        """Resume interrupted optimization"""
+
+        # Load existing study
         study = optuna.load_study(
             study_name=study_name,
             storage=storage_url
         )
         
-        logger.info(f"📂 Загружено study с {len(study.trials)} trials")
-        
-        # Продолжение оптимизации
+        logger.info(f"📂 Loaded study with {len(study.trials)} trials")
+
+        # Continue optimization
         def objective(trial):
-            # Здесь нужно передать оригинальную objective function
-            # В реальной реализации это должно быть сохранено
-            raise NotImplementedError("Для resume нужна сохраненная objective function")
+            # The original objective function needs to be passed here
+            # In a real implementation this should be saved
+            raise NotImplementedError("Resume requires a saved objective function")
         
         study.optimize(objective, n_trials=additional_trials)
         
-        # Создание результата
+        # Create result
         result = TuningResult(
             best_params=study.best_params,
             best_score=study.best_value,
@@ -1044,10 +1044,10 @@ class HyperparameterTuner:
 
 
 if __name__ == "__main__":
-    # Пример использования
-    logger.info("🧪 Тестирование Hyperparameter Tuner...")
-    
-    # Создание синтетических данных
+    # Usage example
+    logger.info("🧪 Testing Hyperparameter Tuner...")
+
+    # Create synthetic data
     np.random.seed(42)
     n_samples = 1000
     n_features = 10
@@ -1057,26 +1057,26 @@ if __name__ == "__main__":
         columns=[f'feature_{i}' for i in range(n_features)]
     )
     
-    # Целевая переменная
+    # Target variable
     y = pd.Series(
         X.iloc[:, :3].sum(axis=1) + 0.1 * np.random.randn(n_samples),
         name='target'
     )
     
-    # Создание конфигурации
+    # Create configuration
     config = TuningConfig(
         strategy=TuningStrategy.OPTUNA_TPE,
         objective=OptimizationObjective.MINIMIZE_RMSE,
-        n_trials=20,  # Мало для быстроты тестирования
+        n_trials=20,  # Low count for fast testing
         cv_folds=3,
         enable_pruning=True
     )
     
-    # Создание туner
+    # Create tuner
     tuner = HyperparameterTuner(config)
     
-    # Оптимизация (используем базовый XGBRegressor для тестирования)
-    from sklearn.ensemble import RandomForestRegressor  # Заглушка для тестирования
+    # Optimization (using base XGBRegressor for testing)
+    from sklearn.ensemble import RandomForestRegressor  # Stub for testing
     
     class MockXGBRegressor:
         def __init__(self, **kwargs):
@@ -1090,4 +1090,4 @@ if __name__ == "__main__":
     
     # result = tuner.optimize(MockXGBRegressor, X, y)
     
-    logger.info("✅ Тестирование Hyperparameter Tuner готово к использованию!")
+    logger.info("✅ Hyperparameter Tuner testing ready for use!")

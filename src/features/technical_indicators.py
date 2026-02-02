@@ -52,7 +52,7 @@ from .feature_engineer import BaseFeatureGenerator, FeatureType
 
 
 class IndicatorType(Enum):
-    """Типы технических индикаторов"""
+    """Types of technical indicators"""
     TREND = "trend"
     MOMENTUM = "momentum"
     VOLUME = "volume"
@@ -64,15 +64,15 @@ class IndicatorType(Enum):
 
 @dataclass
 class TechnicalConfig:
-    """Конфигурация технических индикаторов"""
-    
-    # Периоды для индикаторов
+    """Technical indicators configuration"""
+
+    # Periods for indicators
     sma_periods: List[int] = field(default_factory=lambda: [5, 10, 20, 50, 100, 200])
     ema_periods: List[int] = field(default_factory=lambda: [5, 10, 20, 50, 100])
     rsi_periods: List[int] = field(default_factory=lambda: [14, 21, 30])
     atr_periods: List[int] = field(default_factory=lambda: [14, 20, 30])
     
-    # MACD параметры
+    # MACD parameters
     macd_fast: int = 12
     macd_slow: int = 26
     macd_signal: int = 9
@@ -94,7 +94,7 @@ class TechnicalConfig:
     # CCI
     cci_period: int = 20
     
-    # Включение/выключение групп индикаторов
+    # Enable/disable indicator groups
     enable_trend: bool = True
     enable_momentum: bool = True
     enable_volume: bool = True
@@ -102,36 +102,36 @@ class TechnicalConfig:
     enable_support_resistance: bool = True
     enable_patterns: bool = True
     
-    # Дополнительные опции
+    # Additional options
     normalize_indicators: bool = True
-    add_signal_features: bool = True  # Добавлять buy/sell сигналы
+    add_signal_features: bool = True  # Add buy/sell signals
     add_divergence_features: bool = True
     lookback_divergence: int = 20
 
 
 class TechnicalIndicators(BaseFeatureGenerator):
     """
-    Генератор технических индикаторов для tree моделей
-    
-    Оптимизирован для:
-    - XGBoost и tree-based алгоритмов
-    - Криптовалютные рынки
-    - Высокочастотные данные
-    - Нестационарные временные ряды
+    Technical indicators generator for tree-based models
+
+    Optimized for:
+    - XGBoost and tree-based algorithms
+    - Cryptocurrency markets
+    - High-frequency data
+    - Non-stationary time series
     """
     
     def __init__(self, feature_config, technical_config: Optional[TechnicalConfig] = None):
         self.feature_config = feature_config
         self.config = technical_config or TechnicalConfig()
         
-        # Метаданные созданных признаков
+        # Metadata of created features
         self.feature_names_: List[str] = []
         self.feature_types_: Dict[str, str] = {}
         
-        # Кэш для ускорения повторных вычислений
+        # Cache for accelerating repeated computations
         self._indicator_cache: Dict[str, pd.Series] = {}
         
-        logger.info("🔧 Инициализирован генератор технических индикаторов")
+        logger.info("🔧 Technical indicators generator initialized")
     
     def generate_features(
         self,
@@ -139,32 +139,32 @@ class TechnicalIndicators(BaseFeatureGenerator):
         target: Optional[pd.Series] = None
     ) -> pd.DataFrame:
         """
-        Генерация технических индикаторов
-        
+        Generate technical indicators
+
         Args:
-            data: OHLCV данные
-            target: Целевая переменная (опционально)
+            data: OHLCV data
+            target: Target variable (optional)
         """
         
         start_time = time.time()
-        logger.info("📈 Генерация технических индикаторов...")
+        logger.info("📈 Generating technical indicators...")
         
-        # Валидация входных данных
+        # Validate input data
         required_columns = ['open', 'high', 'low', 'close']
         available_columns = [col for col in required_columns if col in data.columns]
         
         if len(available_columns) < 4:
-            logger.warning("⚠️ Недостаточно OHLC данных для технических индикаторов")
+            logger.warning("⚠️ Insufficient OHLC data for technical indicators")
             return pd.DataFrame(index=data.index)
         
-        # Извлечение OHLCV
+        # Extract OHLCV
         open_prices = data['open']
         high_prices = data['high'] 
         low_prices = data['low']
         close_prices = data['close']
         volume = data.get('volume', pd.Series(index=data.index, data=1.0))
         
-        # Контейнер для всех индикаторов
+        # Container for all indicators
         all_indicators = []
         
         # Trend indicators
@@ -209,35 +209,35 @@ class TechnicalIndicators(BaseFeatureGenerator):
             )
             all_indicators.append(pattern_indicators)
         
-        # Объединение всех индикаторов
+        # Combine all indicators
         if all_indicators:
             result_df = pd.concat([df for df in all_indicators if not df.empty], axis=1)
         else:
             result_df = pd.DataFrame(index=data.index)
         
-        # Нормализация если включена
+        # Normalization if enabled
         if self.config.normalize_indicators:
             result_df = self._normalize_indicators(result_df)
         
-        # Сигнальные признаки
+        # Signal features
         if self.config.add_signal_features:
             signal_features = self._generate_signal_features(result_df, close_prices)
             result_df = pd.concat([result_df, signal_features], axis=1)
         
-        # Дивергенция признаки
+        # Divergence features
         if self.config.add_divergence_features and target is not None:
             divergence_features = self._generate_divergence_features(
                 result_df, close_prices, target
             )
             result_df = pd.concat([result_df, divergence_features], axis=1)
         
-        # Обновление метаданных
+        # Update metadata
         self.feature_names_ = list(result_df.columns)
         for col in result_df.columns:
             self.feature_types_[col] = FeatureType.NUMERICAL.value
         
         generation_time = time.time() - start_time
-        logger.info(f"✅ Создано {len(result_df.columns)} технических индикаторов за {generation_time:.2f}с")
+        logger.info(f"✅ Created {len(result_df.columns)} technical indicators in {generation_time:.2f}s")
         
         return result_df
     
@@ -249,7 +249,7 @@ class TechnicalIndicators(BaseFeatureGenerator):
         close_prices: pd.Series,
         volume: pd.Series
     ) -> pd.DataFrame:
-        """Генерация трендовых индикаторов"""
+        """Generate trend indicators"""
         
         indicators = {}
         
@@ -309,7 +309,7 @@ class TechnicalIndicators(BaseFeatureGenerator):
         close_prices: pd.Series,
         volume: pd.Series
     ) -> pd.DataFrame:
-        """Генерация моментум индикаторов"""
+        """Generate momentum indicators"""
         
         indicators = {}
         
@@ -368,7 +368,7 @@ class TechnicalIndicators(BaseFeatureGenerator):
         close_prices: pd.Series,
         volume: pd.Series
     ) -> pd.DataFrame:
-        """Генерация объемных индикаторов"""
+        """Generate volume indicators"""
         
         indicators = {}
         
@@ -410,7 +410,7 @@ class TechnicalIndicators(BaseFeatureGenerator):
         close_prices: pd.Series,
         volume: pd.Series
     ) -> pd.DataFrame:
-        """Генерация индикаторов волатильности"""
+        """Generate volatility indicators"""
         
         indicators = {}
         
@@ -456,7 +456,7 @@ class TechnicalIndicators(BaseFeatureGenerator):
         close_prices: pd.Series,
         volume: pd.Series
     ) -> pd.DataFrame:
-        """Генерация индикаторов поддержки/сопротивления"""
+        """Generate support/resistance indicators"""
         
         indicators = {}
         
@@ -489,11 +489,11 @@ class TechnicalIndicators(BaseFeatureGenerator):
         close_prices: pd.Series,
         volume: pd.Series
     ) -> pd.DataFrame:
-        """Генерация паттерн индикаторов"""
+        """Generate pattern indicators"""
         
         indicators = {}
         
-        # Candlestick patterns (если доступен TA-Lib)
+        # Candlestick patterns (if TA-Lib is available)
         if TALIB_AVAILABLE:
             # Doji patterns
             indicators['doji'] = talib.CDLDOJI(open_prices.values, high_prices.values, 
@@ -527,7 +527,7 @@ class TechnicalIndicators(BaseFeatureGenerator):
         return pd.DataFrame(indicators, index=close_prices.index)
     
     def _normalize_indicators(self, indicators_df: pd.DataFrame) -> pd.DataFrame:
-        """Нормализация индикаторов для tree моделей"""
+        """Normalize indicators for tree-based models"""
         
         normalized_df = indicators_df.copy()
         
@@ -537,29 +537,29 @@ class TechnicalIndicators(BaseFeatureGenerator):
             if len(values) == 0:
                 continue
             
-            # Определение типа нормализации на основе диапазона значений
+            # Determine normalization type based on value range
             min_val, max_val = values.min(), values.max()
             
             if min_val >= 0 and max_val <= 1:
-                # Уже нормализованные значения (0-1)
+                # Already normalized values (0-1)
                 continue
             elif min_val >= -1 and max_val <= 1:
-                # Уже нормализованные значения (-1 to 1)
+                # Already normalized values (-1 to 1)
                 continue
             elif 'rsi' in col.lower() or 'stoch' in col.lower():
-                # RSI и Stochastic уже в диапазоне 0-100, нормализуем к 0-1
+                # RSI and Stochastic already in range 0-100, normalize to 0-1
                 normalized_df[col] = indicators_df[col] / 100.0
             elif 'williams' in col.lower():
-                # Williams %R в диапазоне -100 to 0, нормализуем к 0-1
+                # Williams %R in range -100 to 0, normalize to 0-1
                 normalized_df[col] = (indicators_df[col] + 100) / 100.0
             elif abs(max_val - min_val) > 1000:
-                # Большой диапазон - применяем robust scaling
+                # Large range - apply robust scaling
                 median_val = values.median()
                 mad = (values - median_val).abs().median()
                 if mad > 0:
                     normalized_df[col] = (indicators_df[col] - median_val) / (1.4826 * mad)
             else:
-                # Стандартная нормализация
+                # Standard normalization
                 mean_val = values.mean()
                 std_val = values.std()
                 if std_val > 0:
@@ -572,11 +572,11 @@ class TechnicalIndicators(BaseFeatureGenerator):
         indicators_df: pd.DataFrame,
         close_prices: pd.Series
     ) -> pd.DataFrame:
-        """Генерация сигнальных признаков"""
+        """Generate signal features"""
         
         signals = {}
         
-        # RSI сигналы
+        # RSI signals
         rsi_cols = [col for col in indicators_df.columns if col.startswith('rsi_')]
         for rsi_col in rsi_cols:
             if rsi_col in indicators_df.columns:
@@ -584,7 +584,7 @@ class TechnicalIndicators(BaseFeatureGenerator):
                 signals[f'{rsi_col}_buy_signal'] = ((rsi < 30) & (rsi.shift(1) >= 30)).astype(int)
                 signals[f'{rsi_col}_sell_signal'] = ((rsi > 70) & (rsi.shift(1) <= 70)).astype(int)
         
-        # MACD сигналы
+        # MACD signals
         if 'macd' in indicators_df.columns and 'macd_signal' in indicators_df.columns:
             macd = indicators_df['macd']
             macd_signal = indicators_df['macd_signal']
@@ -592,7 +592,7 @@ class TechnicalIndicators(BaseFeatureGenerator):
             signals['macd_buy_signal'] = ((macd > macd_signal) & (macd.shift(1) <= macd_signal.shift(1))).astype(int)
             signals['macd_sell_signal'] = ((macd < macd_signal) & (macd.shift(1) >= macd_signal.shift(1))).astype(int)
         
-        # Bollinger Bands сигналы
+        # Bollinger Bands signals
         if 'bb_upper' in indicators_df.columns and 'bb_lower' in indicators_df.columns:
             bb_upper = indicators_df['bb_upper']
             bb_lower = indicators_df['bb_lower']
@@ -608,12 +608,12 @@ class TechnicalIndicators(BaseFeatureGenerator):
         close_prices: pd.Series,
         target: pd.Series
     ) -> pd.DataFrame:
-        """Генерация признаков дивергенции"""
+        """Generate divergence features"""
         
         divergences = {}
         lookback = self.config.lookback_divergence
         
-        # RSI дивергенция
+        # RSI divergence
         rsi_cols = [col for col in indicators_df.columns if col.startswith('rsi_') and not col.endswith('_signal')]
         for rsi_col in rsi_cols:
             if rsi_col in indicators_df.columns:
@@ -874,13 +874,13 @@ class TechnicalIndicators(BaseFeatureGenerator):
     ) -> pd.Series:
         """Parabolic SAR"""
         
-        # Простая реализация Parabolic SAR
+        # Simple Parabolic SAR implementation
         sar = pd.Series(index=high.index, dtype=float)
         trend = pd.Series(index=high.index, dtype=int)
         af = pd.Series(index=high.index, dtype=float)
         ep = pd.Series(index=high.index, dtype=float)
         
-        # Инициализация
+        # Initialization
         sar.iloc[0] = low.iloc[0]
         trend.iloc[0] = 1  # 1 for uptrend, -1 for downtrend
         af.iloc[0] = acceleration
@@ -923,7 +923,7 @@ class TechnicalIndicators(BaseFeatureGenerator):
         return sar
     
     def _calculate_trend_strength(self, prices: pd.Series, period: int = 20) -> pd.Series:
-        """Расчет силы тренда"""
+        """Calculate trend strength"""
         
         # Linear regression slope
         def calculate_slope(y):
@@ -942,7 +942,7 @@ class TechnicalIndicators(BaseFeatureGenerator):
         low: pd.Series,
         close: pd.Series
     ) -> Dict[str, pd.Series]:
-        """Расчет пивот поинтов"""
+        """Calculate pivot points"""
         
         # Daily pivot points
         pivot = (high.shift(1) + low.shift(1) + close.shift(1)) / 3
@@ -969,7 +969,7 @@ class TechnicalIndicators(BaseFeatureGenerator):
         close: pd.Series,
         period: int = 20
     ) -> Dict[str, pd.Series]:
-        """Расчет уровней Фибоначчи"""
+        """Calculate Fibonacci levels"""
         
         # Swing highs and lows over period
         swing_high = high.rolling(window=period).max()
@@ -995,7 +995,7 @@ class TechnicalIndicators(BaseFeatureGenerator):
         close: pd.Series,
         window: int = 20
     ) -> Tuple[pd.Series, pd.Series]:
-        """Расчет уровней поддержки и сопротивления"""
+        """Calculate support and resistance levels"""
         
         # Rolling support and resistance based on min/max
         support = low.rolling(window=window, center=True).min()
@@ -1008,21 +1008,21 @@ class TechnicalIndicators(BaseFeatureGenerator):
         return support, resistance
     
     def _detect_higher_highs(self, high: pd.Series, window: int = 5) -> pd.Series:
-        """Обнаружение растущих максимумов"""
+        """Detect higher highs"""
         
         local_maxima = (high.shift(window) < high) & (high.shift(-window) < high)
         higher_highs = local_maxima & (high > high.shift(window*2))
         return higher_highs.astype(int)
     
     def _detect_lower_lows(self, low: pd.Series, window: int = 5) -> pd.Series:
-        """Обнаружение падающих минимумов"""
+        """Detect lower lows"""
         
         local_minima = (low.shift(window) > low) & (low.shift(-window) > low)
         lower_lows = local_minima & (low < low.shift(window*2))
         return lower_lows.astype(int)
     
     def _detect_double_top(self, high: pd.Series, window: int = 10) -> pd.Series:
-        """Обнаружение двойной вершины"""
+        """Detect double top"""
         
         peaks = find_peaks(high, distance=window)[0]
         double_tops = pd.Series(0, index=high.index)
@@ -1038,7 +1038,7 @@ class TechnicalIndicators(BaseFeatureGenerator):
         return double_tops
     
     def _detect_double_bottom(self, low: pd.Series, window: int = 10) -> pd.Series:
-        """Обнаружение двойного дна"""
+        """Detect double bottom"""
         
         troughs = find_peaks(-low, distance=window)[0]
         double_bottoms = pd.Series(0, index=low.index)
@@ -1054,18 +1054,18 @@ class TechnicalIndicators(BaseFeatureGenerator):
         return double_bottoms
     
     def get_feature_names(self) -> List[str]:
-        """Получение имен созданных признаков"""
+        """Get created feature names"""
         return self.feature_names_
     
     def get_feature_types(self) -> Dict[str, str]:
-        """Получение типов признаков"""
+        """Get feature types"""
         return self.feature_types_
 
 
-# JIT-compiled utility functions для ускорения
+# JIT-compiled utility functions for acceleration
 @jit(nopython=True)
 def fast_ema_calculation(prices: np.ndarray, alpha: float) -> np.ndarray:
-    """Быстрое вычисление EMA с Numba"""
+    """Fast EMA calculation with Numba"""
     
     ema = np.empty_like(prices)
     ema[0] = prices[0]
@@ -1078,7 +1078,7 @@ def fast_ema_calculation(prices: np.ndarray, alpha: float) -> np.ndarray:
 
 @jit(nopython=True)
 def fast_rsi_calculation(prices: np.ndarray, period: int) -> np.ndarray:
-    """Быстрое вычисление RSI с Numba"""
+    """Fast RSI calculation with Numba"""
     
     deltas = np.diff(prices)
     gains = np.where(deltas > 0, deltas, 0)
@@ -1104,15 +1104,15 @@ def fast_rsi_calculation(prices: np.ndarray, period: int) -> np.ndarray:
 
 
 if __name__ == "__main__":
-    # Пример использования
-    logger.info("🧪 Тестирование Technical Indicators...")
-    
-    # Создание синтетических OHLCV данных
+    # Usage example
+    logger.info("Testing Technical Indicators...")
+
+    # Create synthetic OHLCV data
     np.random.seed(42)
     n_samples = 1000
     dates = pd.date_range('2023-01-01', periods=n_samples, freq='1H')
     
-    # Симуляция реалистичных OHLCV данных
+    # Simulate realistic OHLCV data
     price_base = 100
     price_walk = np.cumsum(np.random.randn(n_samples) * 0.001) + price_base
     
@@ -1123,36 +1123,36 @@ if __name__ == "__main__":
     ohlcv_data['low'] = ohlcv_data[['open', 'close']].min(axis=1) - np.random.exponential(0.1, n_samples)
     ohlcv_data['volume'] = np.random.exponential(1000, n_samples)
     
-    # Создание генератора индикаторов
+    # Create indicator generator
     config = TechnicalConfig(
         sma_periods=[5, 10, 20],
         ema_periods=[5, 10, 20],
         rsi_periods=[14, 21],
-        enable_patterns=False  # Отключаем для быстроты тестирования
+        enable_patterns=False  # Disabled for faster testing
     )
     
-    # Mock feature config для совместимости
+    # Mock feature config for compatibility
     from types import SimpleNamespace
     mock_feature_config = SimpleNamespace()
     
     generator = TechnicalIndicators(mock_feature_config, config)
     
-    # Генерация индикаторов
+    # Generate indicators
     start_time = time.time()
     technical_features = generator.generate_features(ohlcv_data)
     generation_time = time.time() - start_time
     
-    logger.info(f"📊 Создано {len(technical_features.columns)} технических индикаторов")
-    logger.info(f"⏱️ Время генерации: {generation_time:.2f}с")
-    logger.info(f"🎯 Индикаторы: {technical_features.columns.tolist()[:10]}...")  # Первые 10
-    
-    # Проверка на пропущенные значения
+    logger.info(f"Created {len(technical_features.columns)} technical indicators")
+    logger.info(f"Generation time: {generation_time:.2f}s")
+    logger.info(f"Indicators: {technical_features.columns.tolist()[:10]}...")  # First 10
+
+    # Check for missing values
     missing_pct = technical_features.isnull().sum() / len(technical_features) * 100
     high_missing = missing_pct[missing_pct > 50]
     
     if not high_missing.empty:
-        logger.warning(f"⚠️ Высокий процент пропусков в: {high_missing.index.tolist()}")
+        logger.warning(f"High percentage of missing values in: {high_missing.index.tolist()}")
     else:
-        logger.info("✅ Качество данных хорошее (< 50% пропусков)")
-    
-    logger.info("✅ Тестирование Technical Indicators завершено!")
+        logger.info("Data quality is good (< 50% missing values)")
+
+    logger.info("Technical Indicators testing completed!")

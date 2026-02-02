@@ -14,7 +14,7 @@ from .feature_engineer import BaseFeatureGenerator, FeatureType
 
 
 class LagType(Enum):
-    """Типы лаговых признаков"""
+    """Types of lag features"""
     SIMPLE = "simple"
     ROLLING = "rolling"
     DIFFERENCE = "difference"
@@ -22,13 +22,13 @@ class LagType(Enum):
 
 @dataclass
 class LagConfig:
-    """Конфигурация лаговых признаков"""
+    """Lag features configuration"""
     max_lags: int = 20
     lag_windows: List[int] = field(default_factory=lambda: [1, 2, 3, 5, 10])
 
 
 class LaggingFeatures(BaseFeatureGenerator):
-    """Генератор лаговых признаков"""
+    """Lag features generator"""
     
     def __init__(self, feature_config, lag_config: Optional[LagConfig] = None):
         self.feature_config = feature_config
@@ -37,7 +37,7 @@ class LaggingFeatures(BaseFeatureGenerator):
         self.feature_types_: Dict[str, str] = {}
     
     def generate_features(self, data: pd.DataFrame, target: Optional[pd.Series] = None) -> pd.DataFrame:
-        """Генерация лаговых признаков"""
+        """Generate lag features"""
         features = {}
         numerical_cols = data.select_dtypes(include=[np.number]).columns
         

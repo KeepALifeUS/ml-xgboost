@@ -14,7 +14,7 @@ from .feature_engineer import BaseFeatureGenerator, FeatureType
 
 
 class VolatilityType(Enum):
-    """Типы волатильности"""
+    """Types of volatility"""
     REALIZED = "realized"
     GARCH = "garch"
     PARKINSON = "parkinson"
@@ -22,14 +22,14 @@ class VolatilityType(Enum):
 
 @dataclass
 class VolatilityConfig:
-    """Конфигурация признаков волатильности"""
+    """Volatility features configuration"""
     windows: List[int] = field(default_factory=lambda: [5, 10, 20, 30])
     enable_realized: bool = True
     enable_garch: bool = True
 
 
 class VolatilityFeatures(BaseFeatureGenerator):
-    """Генератор признаков волатильности"""
+    """Volatility features generator"""
     
     def __init__(self, feature_config, volatility_config: Optional[VolatilityConfig] = None):
         self.feature_config = feature_config
@@ -38,7 +38,7 @@ class VolatilityFeatures(BaseFeatureGenerator):
         self.feature_types_: Dict[str, str] = {}
     
     def generate_features(self, data: pd.DataFrame, target: Optional[pd.Series] = None) -> pd.DataFrame:
-        """Генерация признаков волатильности"""
+        """Generate volatility features"""
         features = {}
         
         if 'close' in data.columns:
@@ -47,11 +47,11 @@ class VolatilityFeatures(BaseFeatureGenerator):
             
             for window in self.config.windows:
                 if self.config.enable_realized:
-                    # Реализованная волатильность
+                    # Realized volatility
                     realized_vol = returns.rolling(window).std() * np.sqrt(252)
                     features[f'realized_vol_{window}'] = realized_vol
                     
-                    # Волатильность волатильности
+                    # Volatility of volatility
                     features[f'vol_of_vol_{window}'] = realized_vol.rolling(window).std()
         
         if 'high' in data.columns and 'low' in data.columns:

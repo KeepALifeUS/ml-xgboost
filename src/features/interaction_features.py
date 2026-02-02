@@ -14,7 +14,7 @@ from .feature_engineer import BaseFeatureGenerator, FeatureType
 
 
 class InteractionType(Enum):
-    """Типы взаимодействующих признаков"""
+    """Types of interaction features"""
     PRODUCT = "product"
     RATIO = "ratio"
     DIFFERENCE = "difference"
@@ -22,13 +22,13 @@ class InteractionType(Enum):
 
 @dataclass
 class InteractionConfig:
-    """Конфигурация взаимодействующих признаков"""
+    """Interaction features configuration"""
     max_degree: int = 2
     correlation_threshold: float = 0.1
 
 
 class InteractionFeatures(BaseFeatureGenerator):
-    """Генератор взаимодействующих признаков"""
+    """Interaction features generator"""
     
     def __init__(self, feature_config, interaction_config: Optional[InteractionConfig] = None):
         self.feature_config = feature_config
@@ -37,14 +37,14 @@ class InteractionFeatures(BaseFeatureGenerator):
         self.feature_types_: Dict[str, str] = {}
     
     def generate_features(self, data: pd.DataFrame, target: Optional[pd.Series] = None) -> pd.DataFrame:
-        """Генерация взаимодействующих признаков"""
+        """Generate interaction features"""
         features = {}
-        numerical_cols = data.select_dtypes(include=[np.number]).columns[:5]  # Ограничиваем для производительности
+        numerical_cols = data.select_dtypes(include=[np.number]).columns[:5]  # Limit for performance
         
-        # Простые взаимодействия между первыми несколькими признаками
+        # Simple interactions between the first few features
         for i, col1 in enumerate(numerical_cols):
             for j, col2 in enumerate(numerical_cols[i+1:], i+1):
-                if len(features) < 20:  # Ограничиваем количество
+                if len(features) < 20:  # Limit the count
                     features[f'{col1}_{col2}_product'] = data[col1] * data[col2]
                     features[f'{col1}_{col2}_ratio'] = data[col1] / (data[col2] + 1e-8)
         

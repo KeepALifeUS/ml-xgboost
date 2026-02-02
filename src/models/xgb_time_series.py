@@ -57,7 +57,7 @@ from numba import jit, prange
 
 
 class ModelType(Enum):
-    """Типы XGBoost моделей"""
+    """XGBoost model types"""
     REGRESSION = "regression"
     BINARY_CLASSIFICATION = "binary_classification"
     MULTICLASS_CLASSIFICATION = "multiclass_classification"
@@ -65,34 +65,34 @@ class ModelType(Enum):
 
 
 class Objective(Enum):
-    """XGBoost objective functions оптимизированные для временных рядов"""
-    
+    """XGBoost objective functions optimized for time series"""
+
     # Regression objectives
-    SQUARED_ERROR = "reg:squarederror"  # Основная для price prediction
-    PSEUDO_HUBER = "reg:pseudohubererror"  # Устойчивая к выбросам
-    GAMMA = "reg:gamma"  # Для положительных значений (volatility)
-    TWEEDIE = "reg:tweedie"  # Для zero-inflated данных
-    
-    # Classification objectives  
-    LOGISTIC = "binary:logistic"  # Бинарная классификация (up/down)
-    HINGE = "binary:hinge"  # SVM-like для trend detection
-    MULTICLASS = "multi:softmax"  # Многоклассовая (strong_buy/buy/hold/sell/strong_sell)
-    MULTIPROB = "multi:softprob"  # Вероятности классов
-    
+    SQUARED_ERROR = "reg:squarederror"  # Primary for price prediction
+    PSEUDO_HUBER = "reg:pseudohubererror"  # Robust to outliers
+    GAMMA = "reg:gamma"  # For positive values (volatility)
+    TWEEDIE = "reg:tweedie"  # For zero-inflated data
+
+    # Classification objectives
+    LOGISTIC = "binary:logistic"  # Binary classification (up/down)
+    HINGE = "binary:hinge"  # SVM-like for trend detection
+    MULTICLASS = "multi:softmax"  # Multi-class (strong_buy/buy/hold/sell/strong_sell)
+    MULTIPROB = "multi:softprob"  # Class probabilities
+
     # Ranking objectives
-    RANK_PAIRWISE = "rank:pairwise"  # Для ранжирования активов
-    RANK_NDCG = "rank:ndcg"  # NDCG оптимизация
-    
-    # Survival analysis (для time-to-event)
+    RANK_PAIRWISE = "rank:pairwise"  # For asset ranking
+    RANK_NDCG = "rank:ndcg"  # NDCG optimization
+
+    # Survival analysis (for time-to-event)
     SURVIVAL_COX = "survival:cox"  # Cox regression
     SURVIVAL_AFT = "survival:aft"  # Accelerated failure time
 
 
 @dataclass
 class TrainingConfig:
-    """Конфигурация обучения XGBoost модели"""
-    
-    # Основные параметры
+    """XGBoost model training configuration"""
+
+    # Main parameters
     n_estimators: int = 1000
     max_depth: int = 6
     learning_rate: float = 0.1
@@ -101,7 +101,7 @@ class TrainingConfig:
     colsample_bylevel: float = 0.8
     colsample_bynode: float = 0.8
     
-    # Регуляризация
+    # Regularization
     reg_alpha: float = 0.0  # L1 regularization
     reg_lambda: float = 1.0  # L2 regularization
     gamma: float = 0.0  # Minimum split loss
@@ -111,23 +111,23 @@ class TrainingConfig:
     early_stopping_rounds: int = 50
     eval_metric: Optional[str] = None
     
-    # Производительность
+    # Performance
     n_jobs: int = -1
     random_state: int = 42
     verbosity: int = 0
     
-    # Специфичные для financial
+    # Financial-specific
     monotone_constraints: Optional[Dict[str, int]] = None
     interaction_constraints: Optional[List[List[int]]] = None
     feature_weights: Optional[Dict[str, float]] = None
     
-    # Валидация
+    # Validation
     cv_folds: int = 5
     test_size: float = 0.2
     validation_size: float = 0.1
     
     def to_xgb_params(self) -> Dict[str, Any]:
-        """Конвертация в параметры XGBoost"""
+        """Convert to XGBoost parameters"""
         params = {
             'n_estimators': self.n_estimators,
             'max_depth': self.max_depth,
@@ -145,7 +145,7 @@ class TrainingConfig:
             'verbosity': self.verbosity,
         }
         
-        # Добавляем опциональные параметры
+        # Add optional parameters
         if self.monotone_constraints:
             params['monotone_constraints'] = self.monotone_constraints
         if self.interaction_constraints:
@@ -156,7 +156,7 @@ class TrainingConfig:
 
 @dataclass
 class ModelMetrics:
-    """Метрики производительности модели"""
+    """Model performance metrics"""
     
     # Regression metrics
     rmse: Optional[float] = None
@@ -184,19 +184,19 @@ class ModelMetrics:
     best_iteration: Optional[int] = None
     
     def to_dict(self) -> Dict[str, Any]:
-        """Конвертация в словарь"""
+        """Convert to dictionary"""
         return {k: v for k, v in self.__dict__.items() if v is not None}
-    
+
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'ModelMetrics':
-        """Создание из словаря"""
+        """Create from dictionary"""
         return cls(**{k: v for k, v in data.items() if hasattr(cls, k)})
 
 
 class BaseXGBoostModel(ABC, BaseEstimator):
     """
-    Базовый класс для XGBoost моделей
-    Реализует enterprise patterns
+    Base class for XGBoost models
+    Implements enterprise patterns
     """
     
     def __init__(
@@ -230,7 +230,7 @@ class BaseXGBoostModel(ABC, BaseEstimator):
         self._setup_logging()
     
     def _setup_logging(self):
-        """Настройка логирования"""
+        """Set up logging"""
         logger.add(
             f"logs/xgb_model_{self.model_name}_{datetime.now():%Y%m%d}.log",
             rotation="daily",
@@ -240,16 +240,16 @@ class BaseXGBoostModel(ABC, BaseEstimator):
     
     @abstractmethod
     def _get_default_objective(self) -> str:
-        """Получение objective function по умолчанию"""
+        """Get default objective function"""
         pass
     
     @abstractmethod 
     def _create_model(self) -> xgb.XGBModel:
-        """Создание XGBoost модели"""
+        """Create XGBoost model"""
         pass
-    
+
     def _prepare_objective(self) -> str:
-        """Подготовка objective function"""
+        """Prepare objective function"""
         if self.objective is None:
             return self._get_default_objective()
         elif isinstance(self.objective, Objective):
@@ -262,22 +262,22 @@ class BaseXGBoostModel(ABC, BaseEstimator):
         X: Union[pd.DataFrame, np.ndarray],
         y: Optional[Union[pd.Series, np.ndarray]] = None
     ) -> Tuple[pd.DataFrame, Optional[pd.Series]]:
-        """Подготовка данных для обучения"""
-        
-        # Конвертация в DataFrame если нужно
+        """Prepare data for training"""
+
+        # Convert to DataFrame if needed
         if isinstance(X, np.ndarray):
             X = pd.DataFrame(X, columns=[f'feature_{i}' for i in range(X.shape[1])])
         
-        # Очистка данных
+        # Clean data
         X = X.copy()
         
-        # Обработка пропусков
+        # Handle missing values
         X = X.fillna(method='ffill').fillna(method='bfill').fillna(0)
         
-        # Удаление inf значений
+        # Remove inf values
         X = X.replace([np.inf, -np.inf], 0)
         
-        # Обработка y если есть
+        # Process y if present
         if y is not None:
             if isinstance(y, np.ndarray):
                 y = pd.Series(y)
@@ -292,12 +292,12 @@ class BaseXGBoostModel(ABC, BaseEstimator):
         y: pd.Series,
         validation_size: float = 0.1
     ) -> Tuple[pd.DataFrame, pd.Series, pd.DataFrame, pd.Series]:
-        """Создание train/validation разбиения с учетом временной структуры"""
+        """Create train/validation split respecting temporal structure"""
         
         n_samples = len(X)
         n_val = int(n_samples * validation_size)
         
-        # Временное разделение - validation это последние данные
+        # Temporal split - validation is the most recent data
         X_train = X.iloc[:-n_val]
         y_train = y.iloc[:-n_val]
         X_val = X.iloc[-n_val:]
@@ -318,27 +318,27 @@ class BaseXGBoostModel(ABC, BaseEstimator):
         verbose: bool = True
     ) -> 'BaseXGBoostModel':
         """
-        Обучение XGBoost модели
-        
+        Train the XGBoost model
+
         Args:
-            X: Матрица признаков
-            y: Целевая переменная
-            X_val: Валидационная выборка признаков
-            y_val: Валидационная целевая переменная
-            sample_weight: Веса образцов
-            eval_set: Набор для evaluation
-            verbose: Вывод прогресса
+            X: Feature matrix
+            y: Target variable
+            X_val: Validation feature set
+            y_val: Validation target variable
+            sample_weight: Sample weights
+            eval_set: Evaluation set
+            verbose: Progress output
         """
         start_time = time.time()
         
         if verbose:
-            logger.info(f"🚀 Начало обучения модели {self.model_name}")
-        
-        # Подготовка данных
+            logger.info(f"🚀 Starting model training {self.model_name}")
+
+        # Prepare data
         X, y = self._prepare_data(X, y)
         self.feature_names_ = list(X.columns)
         
-        # Создание validation set если не предоставлен
+        # Create validation set if not provided
         if X_val is None and eval_set is None:
             X_train, y_train, X_val, y_val = self._create_validation_sets(
                 X, y, self.config.validation_size
@@ -348,17 +348,17 @@ class BaseXGBoostModel(ABC, BaseEstimator):
             if X_val is not None and y_val is not None:
                 X_val, y_val = self._prepare_data(X_val, y_val)
         
-        # Создание модели
+        # Create model
         self.model_ = self._create_model()
-        
-        # Настройка eval_set
+
+        # Configure eval_set
         if eval_set is None and X_val is not None:
             eval_set = [(X_train, y_train), (X_val, y_val)]
             eval_names = ['train', 'validation']
         else:
             eval_names = None
         
-        # Обучение с progress bar
+        # Training with progress bar
         if verbose:
             with Progress(
                 SpinnerColumn(),
@@ -366,9 +366,9 @@ class BaseXGBoostModel(ABC, BaseEstimator):
                 BarColumn(),
                 TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
             ) as progress:
-                task = progress.add_task("Обучение модели...", total=100)
-                
-                # Callbacks для отслеживания прогресса
+                task = progress.add_task("Training model...", total=100)
+
+                # Callbacks for progress tracking
                 callbacks = []
                 if hasattr(xgb, 'callback'):
                     def progress_callback(env):
@@ -396,7 +396,7 @@ class BaseXGBoostModel(ABC, BaseEstimator):
                 verbose=False
             )
         
-        # Вычисление метрик
+        # Calculate metrics
         training_time = time.time() - start_time
         self.metrics_ = self._calculate_metrics(X_train, y_train, X_val, y_val, training_time)
         
@@ -408,13 +408,13 @@ class BaseXGBoostModel(ABC, BaseEstimator):
         if self.enable_shap:
             self._setup_shap_explainer(X_train)
         
-        # Сохранение истории обучения
+        # Save training history
         self._save_training_history(X_train, y_train, training_time)
         
         if verbose:
             self._display_training_results()
         
-        logger.info(f"✅ Обучение завершено за {training_time:.2f}с")
+        logger.info(f"✅ Training completed in {training_time:.2f}s")
         
         return self
     
@@ -423,15 +423,15 @@ class BaseXGBoostModel(ABC, BaseEstimator):
         X: Union[pd.DataFrame, np.ndarray],
         use_cache: bool = True
     ) -> np.ndarray:
-        """Предсказание"""
-        
+        """Prediction"""
+
         if self.model_ is None:
-            raise ValueError("Модель не обучена. Вызовите fit() сначала.")
-        
-        # Подготовка данных
+            raise ValueError("Model is not trained. Call fit() first.")
+
+        # Prepare data
         X, _ = self._prepare_data(X)
         
-        # Кэширование предсказаний
+        # Cache predictions
         if use_cache:
             cache_key = f"predict_{hash(str(X.values.tobytes()))}"
             if cache_key in self._prediction_cache:
@@ -441,40 +441,40 @@ class BaseXGBoostModel(ABC, BaseEstimator):
         predictions = self.model_.predict(X)
         prediction_time = time.time() - start_time
         
-        # Обновление метрик времени предсказания
+        # Update prediction time metrics
         if self.metrics_:
             self.metrics_.prediction_time = prediction_time
         
-        # Кэширование результата
+        # Cache result
         if use_cache:
             self._prediction_cache[cache_key] = predictions
         
         return predictions
     
     def predict_proba(self, X: Union[pd.DataFrame, np.ndarray]) -> np.ndarray:
-        """Предсказание вероятностей (для классификации)"""
-        
+        """Predict probabilities (for classification)"""
+
         if not hasattr(self.model_, 'predict_proba'):
-            raise AttributeError("Модель не поддерживает predict_proba")
+            raise AttributeError("Model does not support predict_proba")
         
         X, _ = self._prepare_data(X)
         return self.model_.predict_proba(X)
     
     def _calculate_feature_importance(self):
-        """Вычисление важности признаков"""
+        """Calculate feature importance"""
         
         if self.model_ is None:
             return
         
-        # Получение важности из модели
+        # Get importance from model
         importance_gain = self.model_.feature_importances_
         
-        # Получение других метрик важности если доступны
+        # Get other importance metrics if available
         booster = self.model_.get_booster()
         importance_weight = booster.get_score(importance_type='weight')
         importance_cover = booster.get_score(importance_type='cover')
         
-        # Создание DataFrame с важностью
+        # Create DataFrame with importance
         feature_importance_data = []
         for i, feature_name in enumerate(self.feature_names_):
             feature_importance_data.append({
@@ -495,11 +495,11 @@ class BaseXGBoostModel(ABC, BaseEstimator):
         top_k: Optional[int] = None
     ) -> pd.DataFrame:
         """
-        Получение важности признаков
-        
+        Get feature importance
+
         Args:
-            importance_type: Тип важности ('gain', 'weight', 'cover')
-            top_k: Количество топ признаков
+            importance_type: Importance type ('gain', 'weight', 'cover')
+            top_k: Number of top features
         """
         
         if self.feature_importance_ is None:
@@ -520,23 +520,23 @@ class BaseXGBoostModel(ABC, BaseEstimator):
         return result
     
     def _setup_shap_explainer(self, X_train: pd.DataFrame):
-        """Настройка SHAP explainer"""
+        """Set up SHAP explainer"""
         
         try:
-            # Используем TreeExplainer для XGBoost
+            # Use TreeExplainer for XGBoost
             self.shap_explainer_ = shap.TreeExplainer(self.model_)
             
-            # Вычисляем SHAP values на sample данных для инициализации
+            # Calculate SHAP values on sample data for initialization
             sample_size = min(100, len(X_train))
             sample_indices = np.random.choice(len(X_train), sample_size, replace=False)
             X_sample = X_train.iloc[sample_indices]
             
             self.shap_values_ = self.shap_explainer_.shap_values(X_sample)
             
-            logger.info("✅ SHAP explainer настроен успешно")
+            logger.info("✅ SHAP explainer set up successfully")
             
         except Exception as e:
-            logger.warning(f"⚠️ Ошибка настройки SHAP: {e}")
+            logger.warning(f"⚠️ Error setting up SHAP: {e}")
             self.enable_shap = False
     
     def get_shap_values(
@@ -545,19 +545,19 @@ class BaseXGBoostModel(ABC, BaseEstimator):
         max_samples: int = 1000
     ) -> np.ndarray:
         """
-        Получение SHAP values
-        
+        Get SHAP values
+
         Args:
-            X: Данные для объяснения
-            max_samples: Максимальное количество образцов для анализа
+            X: Data to explain
+            max_samples: Maximum number of samples for analysis
         """
-        
+
         if not self.enable_shap or self.shap_explainer_ is None:
-            raise ValueError("SHAP не настроен. Установите enable_shap=True при создании модели.")
+            raise ValueError("SHAP is not set up. Set enable_shap=True when creating the model.")
         
         X, _ = self._prepare_data(X)
         
-        # Ограничиваем количество образцов для производительности
+        # Limit number of samples for performance
         if len(X) > max_samples:
             sample_indices = np.random.choice(len(X), max_samples, replace=False)
             X = X.iloc[sample_indices]
@@ -568,7 +568,7 @@ class BaseXGBoostModel(ABC, BaseEstimator):
         
         shap_values = self.shap_explainer_.shap_values(X)
         
-        # Кэширование
+        # Caching
         self._explanation_cache[cache_key] = shap_values
         
         return shap_values
@@ -579,15 +579,15 @@ class BaseXGBoostModel(ABC, BaseEstimator):
         top_k: int = 20,
         save_path: Optional[str] = None
     ):
-        """Визуализация важности признаков"""
+        """Visualize feature importance"""
         
         importance_df = self.get_feature_importance(importance_type, top_k)
         
         if importance_df.empty:
-            logger.warning("⚠️ Нет данных о важности признаков")
+            logger.warning("⚠️ No feature importance data available")
             return
-        
-        # Создание графика
+
+        # Create plot
         fig, ax = plt.subplots(figsize=(12, 8))
         
         # Horizontal bar plot
@@ -598,14 +598,14 @@ class BaseXGBoostModel(ABC, BaseEstimator):
             alpha=0.7
         )
         
-        # Настройка осей
+        # Configure axes
         ax.set_yticks(range(len(importance_df)))
         ax.set_yticklabels(importance_df['feature'])
         ax.set_xlabel(f'Feature Importance ({importance_type.capitalize()})')
         ax.set_title(f'Top {top_k} Feature Importance - {self.model_name}')
         ax.grid(True, alpha=0.3)
         
-        # Добавление значений на столбцы
+        # Add values to bars
         for i, bar in enumerate(bars):
             width = bar.get_width()
             ax.text(width, bar.get_y() + bar.get_height()/2,
@@ -615,7 +615,7 @@ class BaseXGBoostModel(ABC, BaseEstimator):
         
         if save_path:
             plt.savefig(save_path, dpi=300, bbox_inches='tight')
-            logger.info(f"📊 График важности признаков сохранен: {save_path}")
+            logger.info(f"📊 Feature importance plot saved: {save_path}")
         else:
             plt.show()
     
@@ -628,7 +628,7 @@ class BaseXGBoostModel(ABC, BaseEstimator):
         """SHAP summary plot"""
         
         if not self.enable_shap:
-            logger.warning("⚠️ SHAP не включен")
+            logger.warning("⚠️ SHAP is not enabled")
             return
         
         X, _ = self._prepare_data(X)
@@ -643,7 +643,7 @@ class BaseXGBoostModel(ABC, BaseEstimator):
         
         if save_path:
             plt.savefig(save_path, dpi=300, bbox_inches='tight')
-            logger.info(f"📊 SHAP summary plot сохранен: {save_path}")
+            logger.info(f"📊 SHAP summary plot saved: {save_path}")
     
     @abstractmethod
     def _calculate_metrics(
@@ -654,7 +654,7 @@ class BaseXGBoostModel(ABC, BaseEstimator):
         y_val: Optional[pd.Series],
         training_time: float
     ) -> ModelMetrics:
-        """Вычисление метрик модели"""
+        """Calculate model metrics"""
         pass
     
     def _save_training_history(
@@ -663,7 +663,7 @@ class BaseXGBoostModel(ABC, BaseEstimator):
         y_train: pd.Series, 
         training_time: float
     ):
-        """Сохранение истории обучения"""
+        """Save training history"""
         
         history_entry = {
             'timestamp': datetime.now().isoformat(),
@@ -678,15 +678,15 @@ class BaseXGBoostModel(ABC, BaseEstimator):
         self.training_history_.append(history_entry)
     
     def _display_training_results(self):
-        """Отображение результатов обучения"""
+        """Display training results"""
         
         if self.metrics_ is None:
             return
         
-        # Создание таблицы с результатами
-        table = Table(title=f"🎯 РЕЗУЛЬТАТЫ ОБУЧЕНИЯ - {self.model_name}")
-        table.add_column("Метрика", style="cyan")
-        table.add_column("Значение", style="green")
+        # Create results table
+        table = Table(title=f"🎯 TRAINING RESULTS - {self.model_name}")
+        table.add_column("Metric", style="cyan")
+        table.add_column("Value", style="green")
         
         metrics_dict = self.metrics_.to_dict()
         for key, value in metrics_dict.items():
@@ -699,17 +699,17 @@ class BaseXGBoostModel(ABC, BaseEstimator):
         self.console.print(table)
     
     def save_model(self, path: Union[str, Path], include_shap: bool = True):
-        """Сохранение модели"""
+        """Save model"""
         
         path = Path(path)
         path.mkdir(parents=True, exist_ok=True)
         
-        # Сохранение XGBoost модели
+        # Save XGBoost model
         if self.model_:
             model_path = path / "xgb_model.json"
             self.model_.save_model(str(model_path))
         
-        # Сохранение метаданных
+        # Save metadata
         metadata = {
             'model_name': self.model_name,
             'feature_names': self.feature_names_,
@@ -724,30 +724,30 @@ class BaseXGBoostModel(ABC, BaseEstimator):
         with open(path / "metadata.json", 'w') as f:
             json.dump(metadata, f, indent=2, default=str)
         
-        # Сохранение feature importance
+        # Save feature importance
         if self.feature_importance_ is not None:
             self.feature_importance_.to_csv(path / "feature_importance.csv", index=False)
         
-        # Сохранение SHAP explainer
+        # Save SHAP explainer
         if include_shap and self.shap_explainer_:
             joblib.dump(self.shap_explainer_, path / "shap_explainer.pkl")
         
-        logger.info(f"💾 Модель сохранена в {path}")
+        logger.info(f"💾 Model saved to {path}")
     
     @classmethod
     def load_model(cls, path: Union[str, Path]) -> 'BaseXGBoostModel':
-        """Загрузка модели"""
+        """Load model"""
         
         path = Path(path)
         
-        # Загрузка метаданных
+        # Load metadata
         with open(path / "metadata.json", 'r') as f:
             metadata = json.load(f)
         
-        # Создание конфигурации
+        # Create configuration
         config = TrainingConfig(**metadata['config'])
-        
-        # Создание экземпляра модели
+
+        # Create model instance
         model = cls(
             config=config,
             objective=metadata.get('objective'),
@@ -756,36 +756,36 @@ class BaseXGBoostModel(ABC, BaseEstimator):
             model_name=metadata.get('model_name')
         )
         
-        # Загрузка XGBoost модели
+        # Load XGBoost model
         model.model_ = model._create_model()
         if (path / "xgb_model.json").exists():
             model.model_.load_model(str(path / "xgb_model.json"))
         
-        # Восстановление атрибутов
+        # Restore attributes
         model.feature_names_ = metadata.get('feature_names', [])
         model.training_history_ = metadata.get('training_history', [])
         
-        # Загрузка метрик
+        # Load metrics
         if metadata.get('metrics'):
             model.metrics_ = ModelMetrics.from_dict(metadata['metrics'])
         
-        # Загрузка feature importance
+        # Load feature importance
         importance_path = path / "feature_importance.csv"
         if importance_path.exists():
             model.feature_importance_ = pd.read_csv(importance_path)
         
-        # Загрузка SHAP explainer
+        # Load SHAP explainer
         shap_path = path / "shap_explainer.pkl"
         if shap_path.exists():
             model.shap_explainer_ = joblib.load(shap_path)
         
-        logger.info(f"📂 Модель загружена из {path}")
+        logger.info(f"📂 Model loaded from {path}")
         
         return model
 
 
 class XGBoostRegressor(BaseXGBoostModel, RegressorMixin):
-    """XGBoost регрессор для предсказания цен временных рядов"""
+    """XGBoost regressor for time series price prediction"""
     
     def __init__(
         self,
@@ -807,7 +807,7 @@ class XGBoostRegressor(BaseXGBoostModel, RegressorMixin):
         return Objective.SQUARED_ERROR.value
     
     def _create_model(self) -> xgb.XGBRegressor:
-        """Создание XGBoost регрессора"""
+        """Create XGBoost regressor"""
         
         params = self.config.to_xgb_params()
         params['objective'] = self._prepare_objective()
@@ -822,12 +822,12 @@ class XGBoostRegressor(BaseXGBoostModel, RegressorMixin):
         y_val: Optional[pd.Series],
         training_time: float
     ) -> ModelMetrics:
-        """Вычисление regression метрик"""
-        
-        # Предсказания на train set
+        """Calculate regression metrics"""
+
+        # Predictions on train set
         y_train_pred = self.model_.predict(X_train)
         
-        # Базовые regression метрики
+        # Basic regression metrics
         metrics = ModelMetrics(
             rmse=np.sqrt(mean_squared_error(y_train, y_train_pred)),
             mae=mean_absolute_error(y_train, y_train_pred),
@@ -838,22 +838,22 @@ class XGBoostRegressor(BaseXGBoostModel, RegressorMixin):
             best_iteration=getattr(self.model_, 'best_iteration', None)
         )
         
-        # MAPE (если нет нулевых значений)
+        # MAPE (if no zero values)
         if not (y_train == 0).any():
             metrics.mape = mean_absolute_percentage_error(y_train, y_train_pred)
         
-        # Метрики на validation set
+        # Metrics on validation set
         if X_val is not None and y_val is not None:
             y_val_pred = self.model_.predict(X_val)
             
-            # Directional accuracy для trading
+            # Directional accuracy for trading
             y_train_direction = np.sign(y_train.diff().fillna(0))
             y_train_pred_direction = np.sign(pd.Series(y_train_pred).diff().fillna(0))
             metrics.directional_accuracy = accuracy_score(
                 y_train_direction, y_train_pred_direction
             )
             
-            # Trading метрики
+            # Trading metrics
             returns_actual = y_val.pct_change().fillna(0)
             returns_pred = pd.Series(y_val_pred).pct_change().fillna(0)
             
@@ -870,7 +870,7 @@ class XGBoostRegressor(BaseXGBoostModel, RegressorMixin):
 
 
 class XGBoostClassifier(BaseXGBoostModel, ClassifierMixin):
-    """XGBoost классификатор для предсказания направления движения цен"""
+    """XGBoost classifier for predicting price movement direction"""
     
     def __init__(
         self,
@@ -883,7 +883,7 @@ class XGBoostClassifier(BaseXGBoostModel, ClassifierMixin):
     ):
         self.n_classes = n_classes
         
-        # Выбор objective в зависимости от количества классов
+        # Choose objective based on number of classes
         if objective is None:
             objective = (
                 Objective.LOGISTIC if n_classes == 2 
@@ -905,7 +905,7 @@ class XGBoostClassifier(BaseXGBoostModel, ClassifierMixin):
         )
     
     def _create_model(self) -> xgb.XGBClassifier:
-        """Создание XGBoost классификатора"""
+        """Create XGBoost classifier"""
         
         params = self.config.to_xgb_params()
         params['objective'] = self._prepare_objective()
@@ -923,12 +923,12 @@ class XGBoostClassifier(BaseXGBoostModel, ClassifierMixin):
         y_val: Optional[pd.Series],
         training_time: float
     ) -> ModelMetrics:
-        """Вычисление classification метрик"""
-        
-        # Предсказания на train set
+        """Calculate classification metrics"""
+
+        # Predictions on train set
         y_train_pred = self.model_.predict(X_train)
-        
-        # Базовые classification метрики
+
+        # Basic classification metrics
         metrics = ModelMetrics(
             accuracy=accuracy_score(y_train, y_train_pred),
             precision=precision_score(y_train, y_train_pred, average='weighted', zero_division=0),
@@ -944,13 +944,13 @@ class XGBoostClassifier(BaseXGBoostModel, ClassifierMixin):
 
 class XGBoostTimeSeriesModel(XGBoostRegressor):
     """
-    Специализированная XGBoost модель для временных рядов временных рядов
-    
-    Оптимизирована для:
-    - Временной структуры данных
-    - Нестационарности временных рядовных рядов
-    - Режимных сдвигов и волатильности
-    - Высокочастотных данных
+    Specialized XGBoost model for time series
+
+    Optimized for:
+    - Temporal data structure
+    - Non-stationarity of time series
+    - Regime shifts and volatility
+    - High-frequency data
     """
     
     def __init__(
@@ -967,14 +967,14 @@ class XGBoostTimeSeriesModel(XGBoostRegressor):
         volatility_features: bool = True,
         regime_detection: bool = True
     ):
-        # Time series параметры
+        # Time series parameters
         self.time_feature_engineering = time_feature_engineering
         self.lag_features = lag_features
         self.rolling_windows = rolling_windows or [5, 10, 20, 50]
         self.volatility_features = volatility_features
         self.regime_detection = regime_detection
         
-        # Специальная конфигурация для временных рядов
+        # Special configuration for time series
         if config is None:
             config = TrainingConfig(
                 n_estimators=500,
@@ -990,7 +990,7 @@ class XGBoostTimeSeriesModel(XGBoostRegressor):
         
         super().__init__(
             config=config,
-            objective=objective or Objective.PSEUDO_HUBER,  # Устойчивая к выбросам
+            objective=objective or Objective.PSEUDO_HUBER,  # Robust to outliers
             enable_shap=enable_shap,
             enable_feature_tracking=enable_feature_tracking,
             model_name=model_name or "XGBoostTimeSeriesModel"
@@ -1002,19 +1002,19 @@ class XGBoostTimeSeriesModel(XGBoostRegressor):
         y: Optional[pd.Series] = None,
         create_features: bool = True
     ) -> Tuple[pd.DataFrame, Optional[pd.Series]]:
-        """Подготовка данных временных рядов с созданием признаков"""
+        """Prepare time series data with feature creation"""
         
         X, y = self._prepare_data(X, y)
         
         if not create_features or not self.time_feature_engineering:
             return X, y
         
-        logger.info("🔧 Создание признаков временных рядов...")
-        
-        # Создание копии для модификации
+        logger.info("🔧 Creating time series features...")
+
+        # Create copy for modification
         X_enhanced = X.copy()
         
-        # Сортировка по времени если есть временной индекс
+        # Sort by time if datetime index exists
         if isinstance(X.index, pd.DatetimeIndex):
             X_enhanced = X_enhanced.sort_index()
             if y is not None:
@@ -1054,15 +1054,15 @@ class XGBoostTimeSeriesModel(XGBoostRegressor):
                     # GARCH-like volatility proxy
                     X_enhanced[f'{col}_vol_proxy'] = log_returns.rolling(20).std()
         
-        # Очистка от NaN значений после создания признаков
+        # Clean NaN values after feature creation
         X_enhanced = X_enhanced.fillna(method='ffill').fillna(method='bfill').fillna(0)
         
         if y is not None:
-            # Удаляем соответствующие строки из y
+            # Remove corresponding rows from y
             valid_indices = X_enhanced.index
             y = y.reindex(valid_indices).fillna(method='ffill').fillna(method='bfill')
         
-        logger.info(f"✅ Создано {len(X_enhanced.columns)} признаков (было {len(X.columns)})")
+        logger.info(f"✅ Created {len(X_enhanced.columns)} features (was {len(X.columns)})")
         
         return X_enhanced, y
     
@@ -1076,12 +1076,12 @@ class XGBoostTimeSeriesModel(XGBoostRegressor):
         eval_set: Optional[List[Tuple]] = None,
         verbose: bool = True
     ) -> 'XGBoostTimeSeriesModel':
-        """Обучение с time series feature engineering"""
-        
-        # Создание признаков временных рядов
+        """Training with time series feature engineering"""
+
+        # Create time series features
         X_enhanced, y_prepared = self._prepare_time_series_data(X, y, create_features=True)
         
-        # Подготовка validation set с теми же признаками
+        # Prepare validation set with the same features
         if X_val is not None:
             X_val_enhanced, y_val_prepared = self._prepare_time_series_data(
                 X_val, y_val, create_features=True
@@ -1089,7 +1089,7 @@ class XGBoostTimeSeriesModel(XGBoostRegressor):
         else:
             X_val_enhanced, y_val_prepared = None, None
         
-        # Вызов родительского метода fit
+        # Call parent fit method
         return super().fit(
             X_enhanced, y_prepared,
             X_val=X_val_enhanced, y_val=y_val_prepared,
@@ -1103,17 +1103,17 @@ class XGBoostTimeSeriesModel(XGBoostRegressor):
         X: Union[pd.DataFrame, np.ndarray],
         use_cache: bool = True
     ) -> np.ndarray:
-        """Предсказание с созданием time series признаков"""
-        
-        # Создание признаков
+        """Prediction with time series feature creation"""
+
+        # Create features
         X_enhanced, _ = self._prepare_time_series_data(X, create_features=True)
         
-        # Предсказание
+        # Prediction
         return super().predict(X_enhanced, use_cache=use_cache)
 
 
 class XGBoostRanker(BaseXGBoostModel):
-    """XGBoost ранжировщик для сортировки временных рядов по привлекательности"""
+    """XGBoost ranker for sorting time series by attractiveness"""
     
     def __init__(
         self,
@@ -1135,7 +1135,7 @@ class XGBoostRanker(BaseXGBoostModel):
         return Objective.RANK_PAIRWISE.value
     
     def _create_model(self) -> xgb.XGBRanker:
-        """Создание XGBoost ранжировщика"""
+        """Create XGBoost ranker"""
         
         params = self.config.to_xgb_params()
         params['objective'] = self._prepare_objective()
@@ -1154,23 +1154,23 @@ class XGBoostRanker(BaseXGBoostModel):
         verbose: bool = True
     ) -> 'XGBoostRanker':
         """
-        Обучение ранжировщика
-        
+        Train the ranker
+
         Args:
-            group: Размеры групп для ранжирования
+            group: Group sizes for ranking
         """
-        
+
         if verbose:
-            logger.info(f"🚀 Начало обучения ранжировщика {self.model_name}")
-        
-        # Подготовка данных
+            logger.info(f"🚀 Starting ranker training {self.model_name}")
+
+        # Prepare data
         X, y = self._prepare_data(X, y)
         self.feature_names_ = list(X.columns)
         
-        # Создание модели
+        # Create model
         self.model_ = self._create_model()
-        
-        # Подготовка eval_set для ранжировщика
+
+        # Prepare eval_set for ranker
         eval_set = None
         eval_group = None
         if X_val is not None and y_val is not None and group_val is not None:
@@ -1178,7 +1178,7 @@ class XGBoostRanker(BaseXGBoostModel):
             eval_set = [(X, y), (X_val, y_val)]
             eval_group = [group, group_val]
         
-        # Обучение
+        # Training
         start_time = time.time()
         
         self.model_.fit(
@@ -1192,7 +1192,7 @@ class XGBoostRanker(BaseXGBoostModel):
         
         training_time = time.time() - start_time
         
-        # Базовые метрики (для ранжировщика метрики специфичные)
+        # Basic metrics (ranker has specific metrics)
         self.metrics_ = ModelMetrics(
             training_time=training_time,
             feature_count=len(self.feature_names_),
@@ -1208,7 +1208,7 @@ class XGBoostRanker(BaseXGBoostModel):
             self._setup_shap_explainer(X)
         
         if verbose:
-            logger.info(f"✅ Обучение ранжировщика завершено за {training_time:.2f}с")
+            logger.info(f"✅ Ranker training completed in {training_time:.2f}s")
         
         return self
     
@@ -1220,7 +1220,7 @@ class XGBoostRanker(BaseXGBoostModel):
         y_val: Optional[pd.Series],
         training_time: float
     ) -> ModelMetrics:
-        """Для ранжировщика метрики рассчитываются отдельно"""
+        """For ranker, metrics are calculated separately"""
         return ModelMetrics(
             training_time=training_time,
             feature_count=len(self.feature_names_),
@@ -1228,10 +1228,10 @@ class XGBoostRanker(BaseXGBoostModel):
         )
 
 
-# JIT-compiled utility functions для ускорения вычислений
+# JIT-compiled utility functions for accelerating computations
 @jit(nopython=True, parallel=True)
 def calculate_rolling_features(data: np.ndarray, window: int) -> np.ndarray:
-    """Быстрое вычисление rolling features с Numba"""
+    """Fast rolling features calculation with Numba"""
     
     n = len(data)
     result = np.empty((n, 4))  # mean, std, min, max
@@ -1251,7 +1251,7 @@ def calculate_rolling_features(data: np.ndarray, window: int) -> np.ndarray:
 
 @jit(nopython=True)
 def calculate_log_returns(prices: np.ndarray) -> np.ndarray:
-    """Быстрое вычисление логарифмических доходностей"""
+    """Fast log returns calculation"""
     
     n = len(prices)
     log_returns = np.empty(n)
@@ -1267,41 +1267,41 @@ def calculate_log_returns(prices: np.ndarray) -> np.ndarray:
 
 
 if __name__ == "__main__":
-    # Пример использования
-    logger.info("🧪 Тестирование XGBoost Time Series Model...")
-    
-    # Создание синтетических данных
+    # Usage example
+    logger.info("🧪 Testing XGBoost Time Series Model...")
+
+    # Create synthetic data
     np.random.seed(42)
     n_samples = 1000
     n_features = 10
     
-    # Временной индекс
+    # Time index
     dates = pd.date_range('2023-01-01', periods=n_samples, freq='1H')
     
-    # Создание признаков с временной зависимостью
+    # Create features with temporal dependence
     X = pd.DataFrame(index=dates)
     
     for i in range(n_features):
-        # Случайная прогулка с трендом
+        # Random walk with trend
         trend = 0.001 * np.arange(n_samples)
         noise = np.random.randn(n_samples) * 0.1
         X[f'feature_{i}'] = trend + noise + np.sin(np.arange(n_samples) * 0.1) * 0.5
     
-    # Целевая переменная - комбинация признаков с шумом
+    # Target variable - combination of features with noise
     y = pd.Series(
         X.iloc[:, :3].sum(axis=1) + 0.2 * np.random.randn(n_samples),
         index=dates,
         name='target'
     )
     
-    # Разделение данных
+    # Split data
     train_size = int(0.8 * n_samples)
     X_train = X.iloc[:train_size]
     y_train = y.iloc[:train_size] 
     X_test = X.iloc[train_size:]
     y_test = y.iloc[train_size:]
     
-    # Создание и обучение модели
+    # Create and train model
     model = XGBoostTimeSeriesModel(
         enable_shap=True,
         time_feature_engineering=True,
@@ -1310,13 +1310,13 @@ if __name__ == "__main__":
         volatility_features=True
     )
     
-    # Обучение
+    # Training
     model.fit(X_train, y_train)
-    
-    # Предсказания
+
+    # Predictions
     predictions = model.predict(X_test)
-    
-    # Метрики
+
+    # Metrics
     rmse = np.sqrt(mean_squared_error(y_test, predictions))
     mae = mean_absolute_error(y_test, predictions)
     r2 = r2_score(y_test, predictions)
@@ -1333,4 +1333,4 @@ if __name__ == "__main__":
     shap_values = model.get_shap_values(X_test.iloc[:100])
     logger.info(f"📈 SHAP values shape: {shap_values.shape}")
     
-    logger.info("✅ Тестирование завершено успешно!")
+    logger.info("✅ Testing completed successfully!")
