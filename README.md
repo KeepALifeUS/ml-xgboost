@@ -1,5 +1,8 @@
 # ML XGBoost
 
+[![CI](https://github.com/KeepALifeUS/ml-xgboost/actions/workflows/ci.yml/badge.svg)](https://github.com/KeepALifeUS/ml-xgboost/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 **Enterprise XGBoost implementation with SHAP/LIME interpretability and advanced feature engineering for time series prediction.**
 
 ML XGBoost provides a production-ready framework built on top of XGBoost, specifically optimized for time series forecasting. It combines advanced feature engineering pipelines, automated hyperparameter tuning, model interpretability via SHAP, and a FastAPI-based prediction service -- all in a single, well-structured package.
